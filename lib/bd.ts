@@ -112,16 +112,25 @@ export function buildView(raw: Raw): BD {
     };
   });
 
-  // Current week = first un-filled week. If everything's filled, synthesize
-  // an empty next week so the Slip screen is never blank.
+  // Current week = first week that's either (a) empty waiting for picks, or
+  // (b) has picks but isn't fully settled. A week with 7 filled picks but
+  // no results yet is THE live slip — that's what the lads work on between
+  // kickoff and full-time. Only weeks where every filled pick has a result
+  // count as "done" and roll past.
   let currentWeekNum: number | null = null;
   for (const w of weeks) {
-    if (!w.filled) {
+    const anyFilled = w.picks.some((p) => p.filled);
+    const everyFilledSettled = w.picks
+      .filter((p) => p.filled)
+      .every((p) => p.result === "Won" || p.result === "Lost" || p.result === "Push");
+    const isDone = anyFilled && everyFilledSettled;
+    if (!isDone) {
       currentWeekNum = w.week;
       break;
     }
   }
   if (currentWeekNum == null && weeks.length) {
+    // Everything's settled — synthesize the next week.
     currentWeekNum = weeks[weeks.length - 1].week + 1;
   }
   let currentWeek = weeks.find((w) => w.week === currentWeekNum);

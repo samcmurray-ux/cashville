@@ -39,7 +39,10 @@ export default function SlipPage() {
 
   const wkNum = selected ?? bd.currentWeekNum;
   const week = bd.weeks.find((w) => w.week === wkNum) ?? bd.currentWeek;
-  const isCurrent = week.week === bd.currentWeekNum && !week.filled;
+  // "Current" simply = this is the active week in the season. A week with
+  // 7 picks but no results yet is still current (the lads are awaiting
+  // kickoff / waiting for full-time). It rolls past only once someone settles.
+  const isCurrent = week.week === bd.currentWeekNum;
   const entered = week.picks.filter((p) => p.filled).length;
 
   const myPick = meId ? week.picks.find((p) => p.playerId === meId) ?? null : null;
