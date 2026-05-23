@@ -81,10 +81,25 @@ export default function StatsPage() {
                 >
                   {r.player.name}
                 </div>
-                <div className="flex gap-1 mt-1">
+                <div className="flex gap-1 mt-1 items-center">
                   <Chip color="var(--c-forest)" small>{r.wins}W</Chip>
                   <Chip color="var(--c-burgundy)" small>{r.losses}L</Chip>
                   {r.pushes > 0 && <Chip color="var(--c-push)" small>{r.pushes}P</Chip>}
+                  {/* Avg odds across winning picks — "how juicy are your
+                      wins?". Hidden if the lad has no wins yet (would be 0.00). */}
+                  {r.avgWinOdds > 0 && (
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: 10,
+                        color: "var(--c-dim)",
+                        letterSpacing: "0.06em",
+                      }}
+                      title="Average odds of winning picks only"
+                    >
+                      win avg @{r.avgWinOdds.toFixed(2)}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -249,13 +264,14 @@ export default function StatsPage() {
                 </div>
                 {/* Tiny tagline under the bar — streak + biggest odds */}
                 <div
-                  className="font-mono uppercase mt-1.5 flex gap-3"
+                  className="font-mono uppercase mt-1.5 flex gap-3 flex-wrap"
                   style={{
                     fontSize: 9,
                     letterSpacing: "0.14em",
                     color: "var(--c-dim)",
                   }}
                 >
+                  <span>avg @{s.avgOdds.toFixed(2)}</span>
                   <span>longest W: {s.longestWin}</span>
                   <span>longest L: {s.longestLose}</span>
                   <span>biggest: {s.biggestOdds.toFixed(2)}</span>

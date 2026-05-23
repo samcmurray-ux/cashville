@@ -10,7 +10,8 @@ export type PlayerStats = {
   pushes: number;
   played: number;
   hitRate: number; // 0..1
-  avgOdds: number;
+  avgOdds: number;        // mean of all picks' odds
+  avgWinOdds: number;     // mean of WINNING picks' odds only
   biggestOdds: number;
   soloKills: number; // weeks where this lad was the only loser
   heroPicks: number; // weeks where the acca won and this lad's pick contributed
@@ -31,6 +32,13 @@ export function computePlayerStats(bd: BD): PlayerStats[] {
     const odds = all.filter((p) => p.odds).map((p) => p.odds!);
     const avg = odds.length ? odds.reduce((a, b) => a + b, 0) / odds.length : 0;
     const biggest = odds.length ? Math.max(...odds) : 0;
+    // Avg odds across WINNING picks only — measures "how juicy are the
+    // bets this lad actually lands?" A high number = they win big when
+    // they win; low = they only land short-price bankers.
+    const wonOdds = won.filter((p) => p.odds).map((p) => p.odds!);
+    const avgWin = wonOdds.length
+      ? wonOdds.reduce((a, b) => a + b, 0) / wonOdds.length
+      : 0;
 
     const soloKills = settled.filter((w) => {
       const losers = w.picks.filter((p) => p.result === "Lost");
@@ -73,6 +81,7 @@ export function computePlayerStats(bd: BD): PlayerStats[] {
       played: all.length,
       hitRate: won.length / Math.max(1, all.length),
       avgOdds: +avg.toFixed(2),
+      avgWinOdds: +avgWin.toFixed(2),
       biggestOdds: +biggest.toFixed(2),
       soloKills,
       heroPicks,
