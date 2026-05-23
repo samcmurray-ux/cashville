@@ -1,18 +1,25 @@
 "use client";
 
-// History — vertical list of weeks, newest first. Tap → expanded slip in v1.1.
+// History — vertical list of weeks, newest first. Tap any card to see the
+// full slip for that week (all 7 picks) in a read-only bottom sheet.
 
+import { useState } from "react";
 import { useBD } from "@/lib/useBD";
 import { Card, Eyebrow, Headline, Chip, Stamp } from "@/components/primitives";
+import { WeekDetailSheet } from "@/components/week-detail-sheet";
 import { fmtMoney } from "@/lib/bd";
 
 export default function HistoryPage() {
   const { bd } = useBD();
+  const [openWeek, setOpenWeek] = useState<number | null>(null);
+
   if (!bd) return null;
 
   const settled = bd.weeks
     .filter((w) => w.filled && w.week !== bd.currentWeekNum)
     .sort((a, b) => b.week - a.week);
+
+  const selected = openWeek != null ? bd.weeks.find((w) => w.week === openWeek) ?? null : null;
 
   return (
     <div className="px-4 py-4 space-y-3">
@@ -33,63 +40,87 @@ export default function HistoryPage() {
               return `${losers.length} missed`;
             })();
         return (
-          <Card key={w.week} accent={w.accaWon ? "var(--c-forest)" : "var(--c-rule-strong)"}>
-            <div className="px-4 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <Eyebrow color={w.accaWon ? "var(--c-forest)" : "var(--c-dim)"}>
-                    Week {w.week} · {fmtDate(w.date)}
-                  </Eyebrow>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <Headline size={26} color={w.accaWon ? "var(--c-forest)" : "var(--c-ink)"}>
-                      @{w.combinedOdds.toFixed(2)}
-                    </Headline>
-                    {w.accaWon && <Stamp color="var(--c-forest)" rotate={-4}>Winner</Stamp>}
+          <button
+            key={w.week}
+            onClick={() => setOpenWeek(w.week)}
+            className="block w-full text-left"
+            aria-label={`Open week ${w.week} detail`}
+          >
+            <Card accent={w.accaWon ? "var(--c-forest)" : "var(--c-rule-strong)"}>
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <Eyebrow color={w.accaWon ? "var(--c-forest)" : "var(--c-dim)"}>
+                      Week {w.week} · {fmtDate(w.date)}
+                    </Eyebrow>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <Headline size={26} color={w.accaWon ? "var(--c-forest)" : "var(--c-ink)"}>
+                        @{w.combinedOdds.toFixed(2)}
+                      </Headline>
+                      {w.accaWon && <Stamp color="var(--c-forest)" rotate={-4}>Winner</Stamp>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div
+                      className="font-display"
+                      style={{
+                        fontSize: 22,
+                        color: w.accaWon ? "var(--c-forest)" : "var(--c-faint)",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {fmtMoney(w.payout || 0)}
+                    </div>
+                    <div
+                      className="font-mono uppercase"
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: "0.15em",
+                        color: "var(--c-faint)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {w.accaWon ? "banked" : "missed"}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div
-                    className="font-display"
-                    style={{
-                      fontSize: 22,
-                      color: w.accaWon ? "var(--c-forest)" : "var(--c-faint)",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {fmtMoney(w.payout || 0)}
-                  </div>
-                  <div
-                    className="font-mono uppercase"
+                <p
+                  className="font-body italic mt-2"
+                  style={{ fontSize: 13, color: "var(--c-ink-soft)" }}
+                >
+                  {summary}
+                </p>
+                <div className="flex gap-1 mt-2 flex-wrap items-center">
+                  <Chip color="var(--c-forest)" small>{w.wonCount}W</Chip>
+                  <Chip color="var(--c-burgundy)" small>{w.lostCount}L</Chip>
+                  {w.pushCount > 0 && (
+                    <Chip color="var(--c-push)" small>
+                      {w.pushCount}P
+                    </Chip>
+                  )}
+                  <span
+                    className="font-mono uppercase ml-auto"
                     style={{
                       fontSize: 9,
-                      letterSpacing: "0.15em",
+                      letterSpacing: "0.2em",
                       color: "var(--c-faint)",
-                      marginTop: 2,
                     }}
                   >
-                    {w.accaWon ? "banked" : "missed"}
-                  </div>
+                    tap to see picks →
+                  </span>
                 </div>
               </div>
-              <p
-                className="font-body italic mt-2"
-                style={{ fontSize: 13, color: "var(--c-ink-soft)" }}
-              >
-                {summary}
-              </p>
-              <div className="flex gap-1 mt-2 flex-wrap">
-                <Chip color="var(--c-forest)" small>{w.wonCount}W</Chip>
-                <Chip color="var(--c-burgundy)" small>{w.lostCount}L</Chip>
-                {w.pushCount > 0 && (
-                  <Chip color="var(--c-push)" small>
-                    {w.pushCount}P
-                  </Chip>
-                )}
-              </div>
-            </div>
-          </Card>
+            </Card>
+          </button>
         );
       })}
+
+      <WeekDetailSheet
+        open={openWeek != null}
+        onClose={() => setOpenWeek(null)}
+        week={selected}
+        players={bd.players}
+      />
     </div>
   );
 }
