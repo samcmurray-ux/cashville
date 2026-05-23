@@ -266,3 +266,50 @@ export async function addMovement(payload: {
 export async function removeMovement(id: string) {
   await sb().from("movements").delete().eq("id", id);
 }
+
+// ─── Settle Week ────────────────────────────────────────────────────────
+// Batch-update all 7 pick results for a week, then update the weeks row
+// with acca_won + combined_odds + payout. Optionally log a 'win' movement
+// when the acca lands so the pot moves automatically.
+export async function settleWeek(args: {
+  weekNum: number;
+  results: Array<{ playerId: string; result: "Won" | "Lost" | "Push" }>;
+  combinedOdds: number;
+  payout: number;
+  logWinMovement: boolean;
+}) {
+  const client = sb();
+  const now = new Date().toISOString();
+
+  // Update each pick result. Done in parallel — Supabase handles concurrency.
+  await Promise.all(
+    args.results.map((r) =>
+      client
+        .from("picks")
+        .update({ result: r.result, updated_at: now })
+        .eq("week_number", args.weekNum)
+        .eq("player_id", r.playerId),
+    ),
+  );
+
+  const accaWon = args.results.every((r) => r.result === "Won");
+
+  await client
+    .from("weeks")
+    .update({
+      acca_won: accaWon,
+      combined_odds: args.combinedOdds,
+      payout: accaWon ? args.payout : 0,
+    })
+    .eq("week_number", args.weekNum);
+
+  // Auto-log the win movement so the pot ledger stays in sync.
+  if (accaWon && args.logWinMovement && args.payout > 0) {
+    await addMovement({
+      week: args.weekNum,
+      type: "win",
+      amount: args.payout,
+      notes: `Acca landed @${args.combinedOdds.toFixed(2)}`,
+    });
+  }
+}

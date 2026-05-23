@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Sheet } from "./sheet";
-import { addPick } from "@/lib/bd";
+import { addPick, clearPick } from "@/lib/bd";
 import type { ViewPick } from "@/lib/types";
 
 const SPORTS = ["Football", "Rugby", "NFL", "Horses", "GAA", "Golf", "NBA", "MMA", "Darts", "Other"] as const;
@@ -256,6 +256,38 @@ export function AddPickSheet({
         )}
 
         <div className="flex gap-2 pt-2">
+          {/* Delete button — only when editing an existing pick. Confirm first
+              so a fat-finger doesn't wipe a real entry. */}
+          {existing?.filled && (
+            <button
+              onClick={async () => {
+                if (!confirm("Delete this pick? It'll vanish from the slip.")) return;
+                setSaving(true);
+                try {
+                  await clearPick(weekNum, playerId);
+                  onSaved?.();
+                  onClose();
+                } catch (e) {
+                  setError((e as Error).message || "Delete failed");
+                  setSaving(false);
+                }
+              }}
+              disabled={saving}
+              aria-label="Delete pick"
+              className="font-stamp uppercase"
+              style={{
+                fontSize: 14,
+                letterSpacing: "0.14em",
+                padding: "0 14px",
+                border: "1.5px solid var(--c-burgundy)",
+                color: "var(--c-burgundy)",
+                background: "transparent",
+                borderRadius: 2,
+              }}
+            >
+              ✕
+            </button>
+          )}
           <button
             onClick={onClose}
             disabled={saving}

@@ -11,6 +11,7 @@ import { useMe } from "@/lib/useMe";
 import { Card, Eyebrow, Headline, Scribble, Stamp } from "@/components/primitives";
 import { SlipRow } from "@/components/slip-row";
 import { AddPickSheet } from "@/components/add-pick-sheet";
+import { SettleWeekSheet } from "@/components/settle-week-sheet";
 import { fmtMoney } from "@/lib/bd";
 
 export default function SlipPage() {
@@ -20,6 +21,7 @@ export default function SlipPage() {
   // Selected week — defaults to current; user can paginate to past weeks.
   const [selected, setSelected] = useState<number | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
+  const [settling, setSettling] = useState(false);
 
   // Memos before any early return so hook order is stable.
   const allWeeks = useMemo(() => {
@@ -291,19 +293,28 @@ export default function SlipPage() {
           />
         </div>
 
-        {/* Settle button — admin only, only on settled-eligible weeks */}
-        {isAdmin && !isCurrent && (
+        {/* Settle button — admins (sam/conor) only. Available on any week
+            once all 7 picks are filled. Re-settling is fine; results overwrite. */}
+        {isAdmin && week.picks.every((p) => p.filled) && (
           <div className="px-4 py-3 border-t" style={{ borderColor: "var(--c-rule)" }}>
-            <p
-              className="font-mono uppercase"
+            <button
+              onClick={() => setSettling(true)}
+              className="w-full font-stamp uppercase py-3"
               style={{
-                fontSize: 10,
-                letterSpacing: "0.18em",
-                color: "var(--c-dim)",
+                background: "var(--c-ink)",
+                color: "var(--c-paper)",
+                border: "none",
+                borderRadius: 2,
+                fontSize: 14,
+                letterSpacing: "0.16em",
               }}
             >
-              Settle flow lands in v1.1 — for now edit results in Supabase.
-            </p>
+              {week.accaWon
+                ? "↺ Re-settle (already won)"
+                : week.picks.some((p) => p.result)
+                  ? "↺ Re-settle this week"
+                  : "Settle this week →"}
+            </button>
           </div>
         )}
       </Card>
@@ -320,8 +331,17 @@ export default function SlipPage() {
           onSaved={() => void reload()}
         />
       )}
-      {/* Tapping someone else's row in v1 doesn't open the sheet (you only
-          edit your own pick). A read-only popover is a v1.1 task. */}
+
+      {/* Settle Week sheet — admin path */}
+      {isAdmin && settling && (
+        <SettleWeekSheet
+          open={true}
+          onClose={() => setSettling(false)}
+          week={week}
+          players={bd.players}
+          onSaved={() => void reload()}
+        />
+      )}
     </div>
   );
 }
