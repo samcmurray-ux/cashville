@@ -125,10 +125,14 @@ export function SlipRow({
           ODDS
         </div>
         <div className="mt-1.5 flex items-center gap-1 justify-end">
-          {/* Past weeks: show result badge first, then an edit pencil for your
-              own rows so you can correct odds/selection after the fact. */}
+          {/* Anyone can edit any row on any week. The `isMe` highlight stays
+              as a visual cue (avatar ring + 'you' chip + gradient) but it
+              doesn't restrict interaction anymore — open trust between the
+              7 lads. */}
+
+          {/* Past weeks: result badge + edit pencil */}
           {!isCurrent && <ResultBadge result={pick.result} small />}
-          {!isCurrent && filled && isMe && onAdd && (
+          {!isCurrent && filled && onAdd && (
             <button
               onClick={onAdd}
               aria-label="Edit pick"
@@ -145,11 +149,29 @@ export function SlipRow({
               ✎
             </button>
           )}
+          {/* Past week with no pick — let anyone backfill it */}
+          {!isCurrent && !filled && onAdd && (
+            <button
+              onClick={onAdd}
+              className="font-stamp uppercase"
+              style={{
+                background: "transparent",
+                color: "var(--c-burgundy)",
+                border: "1.5px solid var(--c-burgundy)",
+                padding: "4px 8px",
+                borderRadius: 2,
+                fontSize: 11,
+                letterSpacing: "0.12em",
+              }}
+            >
+              + Add
+            </button>
+          )}
 
-          {/* Current week: + Add when empty, edit pill + Locked stamp when filled */}
+          {/* Current week + filled: edit pill + Locked stamp */}
           {isCurrent && filled && (
             <>
-              {isMe && onAdd && (
+              {onAdd && (
                 <button
                   onClick={onAdd}
                   className="font-mono uppercase"
@@ -168,35 +190,24 @@ export function SlipRow({
               <Stamp color="var(--c-forest)" rotate={0}>Locked</Stamp>
             </>
           )}
-          {isCurrent && !filled && (
-            isMe && onAdd ? (
-              <button
-                onClick={onAdd}
-                className="font-stamp uppercase"
-                style={{
-                  background: "var(--c-burgundy)",
-                  color: "var(--c-paper)",
-                  border: "none",
-                  padding: "6px 10px",
-                  borderRadius: 2,
-                  fontSize: 12,
-                  letterSpacing: "0.12em",
-                }}
-              >
-                + Add
-              </button>
-            ) : (
-              <span
-                className="font-mono uppercase"
-                style={{
-                  fontSize: 9,
-                  letterSpacing: "0.15em",
-                  color: "var(--c-faint)",
-                }}
-              >
-                waiting
-              </span>
-            )
+          {/* Current week + empty: + Add for any row (burgundy if it's your
+              row, slightly subtler outline for others). */}
+          {isCurrent && !filled && onAdd && (
+            <button
+              onClick={onAdd}
+              className="font-stamp uppercase"
+              style={{
+                background: isMe ? "var(--c-burgundy)" : "transparent",
+                color: isMe ? "var(--c-paper)" : "var(--c-burgundy)",
+                border: isMe ? "none" : "1.5px solid var(--c-burgundy)",
+                padding: "6px 10px",
+                borderRadius: 2,
+                fontSize: 12,
+                letterSpacing: "0.12em",
+              }}
+            >
+              + Add
+            </button>
           )}
         </div>
       </div>

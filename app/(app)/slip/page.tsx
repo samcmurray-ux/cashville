@@ -16,7 +16,10 @@ import { fmtMoney } from "@/lib/bd";
 
 export default function SlipPage() {
   const { bd, reload } = useBD();
-  const { me, meId, isAdmin } = useMe();
+  const { me, meId } = useMe();
+  // No admin gating in v1 — anyone can settle, anyone can edit any row.
+  // The picker just establishes a visual "you" identity for the highlight,
+  // it doesn't grant or restrict permissions.
 
   // Selected week — defaults to current; user can paginate to past weeks.
   const [selected, setSelected] = useState<number | null>(null);
@@ -234,22 +237,21 @@ export default function SlipPage() {
           </button>
         )}
 
-        {/* The 7 rows. Each player can open the Add Pick sheet for their own
-            row on any week — current to lock in, past to correct after the
-            fact (typo in odds, wrong selection text, etc.). */}
+        {/* The 7 rows. Anyone can add, edit or delete any pick on any week —
+            no ownership check. The `isMe` flag is just for visual emphasis
+            (avatar ring + 'you' chip + gradient bg + bigger Add button). */}
         <div>
           {week.picks.map((p, i) => {
             const player = bd.players.find((x) => x.id === p.playerId)!;
-            const youOwnThisRow = meId === p.playerId;
             return (
               <SlipRow
                 key={p.playerId}
                 pick={p}
                 player={player}
                 idx={i}
-                isMe={youOwnThisRow}
+                isMe={meId === p.playerId}
                 isCurrent={isCurrent}
-                onAdd={youOwnThisRow ? () => setEditingPlayer(p.playerId) : undefined}
+                onAdd={() => setEditingPlayer(p.playerId)}
               />
             );
           })}
@@ -293,9 +295,9 @@ export default function SlipPage() {
           />
         </div>
 
-        {/* Settle button — admins (sam/conor) only. Available on any week
-            once all 7 picks are filled. Re-settling is fine; results overwrite. */}
-        {isAdmin && week.picks.every((p) => p.filled) && (
+        {/* Settle button — anyone can settle. Available on any week once all
+            7 picks are filled. Re-settling is fine; results overwrite. */}
+        {week.picks.every((p) => p.filled) && (
           <div className="px-4 py-3 border-t" style={{ borderColor: "var(--c-rule)" }}>
             <button
               onClick={() => setSettling(true)}
@@ -319,21 +321,25 @@ export default function SlipPage() {
         )}
       </Card>
 
-      {/* Add Pick sheet — opens for your own row on whichever week is
-          selected. Past weeks edit the historical pick in place. */}
-      {meId && editingPlayer === meId && (
+      {/* Add Pick sheet — opens for whichever row's tapped (anyone, any week).
+          The sheet title shows the player's name + week so you don't get
+          confused about whose pick you're editing. */}
+      {editingPlayer && (
         <AddPickSheet
           open={true}
           onClose={() => setEditingPlayer(null)}
           weekNum={week.week}
-          playerId={meId}
+          playerId={editingPlayer}
+          playerName={
+            bd.players.find((p) => p.id === editingPlayer)?.name ?? editingPlayer
+          }
           existing={editingPick}
           onSaved={() => void reload()}
         />
       )}
 
-      {/* Settle Week sheet — admin path */}
-      {isAdmin && settling && (
+      {/* Settle Week sheet — anyone can settle */}
+      {settling && (
         <SettleWeekSheet
           open={true}
           onClose={() => setSettling(false)}

@@ -51,6 +51,7 @@ export function AddPickSheet({
   onClose,
   weekNum,
   playerId,
+  playerName,
   existing,
   onSaved,
 }: {
@@ -58,6 +59,7 @@ export function AddPickSheet({
   onClose: () => void;
   weekNum: number;
   playerId: string;
+  playerName?: string;
   existing: ViewPick | null;
   onSaved?: () => void;
 }) {
@@ -110,10 +112,14 @@ export function AddPickSheet({
     }
   };
 
-  const titleAction = existing?.filled ? "Edit pick" : "Add pick";
+  // Title makes it crystal clear whose pick on which week you're editing —
+  // important now that any lad can edit any other lad's row.
+  const titleAction = existing?.filled ? "Edit" : "Add";
+  const whose = playerName ? `${playerName}'s pick` : "pick";
+  const title = `${titleAction} ${whose} · Week ${weekNum}`;
 
   return (
-    <Sheet open={open} onClose={onClose} title={`${titleAction} · Week ${weekNum}`}>
+    <Sheet open={open} onClose={onClose} title={title}>
       <div className="space-y-4">
         {/* Sport selector — chip-style buttons, easier to thumb than a select. */}
         <div>
