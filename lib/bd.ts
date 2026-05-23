@@ -246,16 +246,85 @@ export async function clearPick(weekNum: number, playerId: string) {
   await sb().from("picks").delete().eq("week_number", weekNum).eq("player_id", playerId);
 }
 
+// Per-pick settle. After each call we check if all 7 picks for the week
+// are now settled — if so we roll the week up (acca_won + combined_odds +
+// payout) and auto-log a 'win' movement if it landed. Idempotent: re-tapping
+// W/L/P just overwrites; the win movement check prevents double-logging.
 export async function setPickResult(
   weekNum: number,
   playerId: string,
   result: "Won" | "Lost" | "Push" | null,
 ) {
-  await sb()
+  const client = sb();
+  await client
     .from("picks")
     .update({ result, updated_at: new Date().toISOString() })
     .eq("week_number", weekNum)
     .eq("player_id", playerId);
+
+  // Re-fetch the week's picks to see if we've just completed it.
+  const { data: picks } = await client
+    .from("picks")
+    .select("result, odds, filled")
+    .eq("week_number", weekNum);
+  if (!picks) return;
+
+  const filled = picks.filter((p) => p.filled);
+  const allSettled =
+    filled.length === 7 &&
+    filled.every(
+      (p) => p.result === "Won" || p.result === "Lost" || p.result === "Push",
+    );
+
+  if (!allSettled) {
+    // Either someone hasn't picked, or some results still pending. Reset
+    // the week's settle state so an in-progress settle doesn't show as
+    // banked. Important when the admin un-settles a pick after the fact.
+    await client
+      .from("weeks")
+      .update({ acca_won: false, payout: 0 })
+      .eq("week_number", weekNum);
+    return;
+  }
+
+  // All 7 settled — compute outcome.
+  const allWon = filled.every((p) => p.result === "Won");
+  let combined = 1;
+  for (const p of filled) {
+    if (p.odds && (p.result === "Won" || p.result === "Lost")) {
+      combined *= +p.odds;
+    }
+  }
+  const combinedOdds = +combined.toFixed(2);
+  const payout = allWon ? Math.round(70 * combinedOdds) : 0;
+
+  await client
+    .from("weeks")
+    .update({
+      acca_won: allWon,
+      combined_odds: combinedOdds,
+      payout,
+    })
+    .eq("week_number", weekNum);
+
+  // Auto-log the win movement if the acca landed AND no win movement
+  // already exists for this week (re-settling shouldn't double-log).
+  if (allWon && payout > 0) {
+    const { data: existing } = await client
+      .from("movements")
+      .select("id")
+      .eq("week_number", weekNum)
+      .eq("type", "win")
+      .limit(1);
+    if (!existing || existing.length === 0) {
+      await addMovement({
+        week: weekNum,
+        type: "win",
+        amount: payout,
+        notes: `Acca landed @${combinedOdds.toFixed(2)}`,
+      });
+    }
+  }
 }
 
 export async function addMovement(payload: {

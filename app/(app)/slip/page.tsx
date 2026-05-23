@@ -12,7 +12,7 @@ import { Card, Eyebrow, Headline, Scribble, Stamp } from "@/components/primitive
 import { SlipRow } from "@/components/slip-row";
 import { AddPickSheet } from "@/components/add-pick-sheet";
 import { SettleWeekSheet } from "@/components/settle-week-sheet";
-import { fmtMoney } from "@/lib/bd";
+import { fmtMoney, setPickResult } from "@/lib/bd";
 
 export default function SlipPage() {
   const { bd, reload } = useBD();
@@ -240,9 +240,9 @@ export default function SlipPage() {
           </button>
         )}
 
-        {/* The 7 rows. Anyone can add, edit or delete any pick on any week —
-            no ownership check. The `isMe` flag is just for visual emphasis
-            (avatar ring + 'you' chip + gradient bg + bigger Add button). */}
+        {/* The 7 rows. Anyone can add, edit, delete OR settle any pick on
+            any week. The `isMe` flag is just for visual emphasis (avatar
+            ring + 'you' chip + gradient bg + bigger Add button). */}
         <div>
           {week.picks.map((p, i) => {
             const player = bd.players.find((x) => x.id === p.playerId)!;
@@ -255,6 +255,13 @@ export default function SlipPage() {
                 isMe={meId === p.playerId}
                 isCurrent={isCurrent}
                 onAdd={() => setEditingPlayer(p.playerId)}
+                onSetResult={async (result) => {
+                  // setPickResult also auto-rolls up the week if this is
+                  // the 7th settle (and logs the win movement if it landed).
+                  // Realtime push will re-render everyone.
+                  await setPickResult(week.week, p.playerId, result);
+                  await reload();
+                }}
               />
             );
           })}
