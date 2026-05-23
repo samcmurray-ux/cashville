@@ -8,6 +8,7 @@ import { useMe } from "@/lib/useMe";
 import type { Player } from "@/lib/types";
 import { Avatar, Headline, Postmark, Scribble } from "./primitives";
 import { PlayerPicker } from "./player-picker";
+import { ThemePicker } from "./theme-picker";
 
 export function AppHeader({
   players,
@@ -20,6 +21,7 @@ export function AppHeader({
 }) {
   const { me, setMeId } = useMe();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
 
   return (
     <header
@@ -58,10 +60,44 @@ export function AppHeader({
             </Scribble>
           </div>
         </div>
+        {/* Theme switcher — small palette icon. Stacks above the avatar
+            in the top-right column. */}
+        <div className="flex flex-col items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => setThemePickerOpen(true)}
+            aria-label="Switch theme"
+            className="flex items-center justify-center"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              border: "1.5px solid var(--c-rule-strong)",
+              background: "var(--c-paper)",
+              padding: 3,
+            }}
+          >
+            {/* Three-color stack — a little palette dot for each theme */}
+            <span
+              aria-hidden
+              className="grid"
+              style={{
+                gridTemplateColumns: "1fr 1fr",
+                gap: 1,
+                width: 14,
+                height: 14,
+              }}
+            >
+              <span style={{ background: "var(--c-burgundy)" }} />
+              <span style={{ background: "var(--c-mustard)" }} />
+              <span style={{ background: "var(--c-forest)" }} />
+              <span style={{ background: "var(--c-denim)" }} />
+            </span>
+          </button>
+
         {/* Switch-player button — taps open the picker sheet. */}
         <button
           onClick={() => setPickerOpen(true)}
-          className="shrink-0 flex flex-col items-center gap-1"
+          className="flex flex-col items-center gap-1"
           aria-label="Switch player"
         >
           {me ? (
@@ -90,12 +126,17 @@ export function AppHeader({
             {me ? "switch" : "sign in"}
           </span>
         </button>
+        </div>
       </div>
 
       <PlayerPicker
         players={players}
         open={pickerOpen || !me}
         onClose={() => setPickerOpen(false)}
+      />
+      <ThemePicker
+        open={themePickerOpen}
+        onClose={() => setThemePickerOpen(false)}
       />
     </header>
   );

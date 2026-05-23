@@ -4,8 +4,20 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Travel Almanac (default) — ports _CASHVILLE_THEMES.almanac from app-1.jsx ── */
-:root {
+/* ─── Theme system ───────────────────────────────────────────────────────
+   Three themes ported from _CASHVILLE_THEMES in app-1.jsx. Each is a set
+   of CSS custom properties. The active theme is selected by an attribute
+   on <html>:
+     <html data-theme="almanac">  — cream paper, stamps (default)
+     <html data-theme="stadium">  — dark green felt + brass + cream
+     <html data-theme="tabloid">  — newsprint cream + black + screaming red
+
+   Falls back to almanac if no data-theme is set. Stadium auto-applies on
+   dark-mode-preference users who haven't explicitly chosen a theme. */
+
+/* Travel Almanac (default) */
+:root,
+[data-theme="almanac"] {
   --c-bg: #efe6d4;
   --c-bg2: #ebe0cc;
   --c-paper: #f7f1e2;
@@ -31,10 +43,53 @@
   --font-slab: 'Alfa Slab One';
 }
 
-/* Stadium Night dark theme — auto-applies if user prefers dark.
-   v1.1 will add an explicit theme switcher (Tweaks toggle from the prototype). */
+/* Stadium Night */
+[data-theme="stadium"] {
+  --c-bg: #162017;
+  --c-bg2: #1c2a1f;
+  --c-paper: #1f2e22;
+  --c-ink: #f3ead0;
+  --c-ink-soft: #cebd86;
+  --c-dim: #8c8053;
+  --c-faint: #5a5236;
+  --c-rule: rgba(243, 234, 208, 0.10);
+  --c-rule-strong: rgba(243, 234, 208, 0.40);
+  --c-burgundy: #d6493d;
+  --c-denim: #7eb0e0;
+  --c-mustard: #f0c34c;
+  --c-forest: #7fcb87;
+  --c-brick: #e8a04a;
+  --c-navy: #9fb8d6;
+  --c-push: #f0c34c;
+}
+
+/* Tabloid Tuesday — high-contrast newsprint, screaming red.
+   Display headlines swap to Alfa Slab One for the screaming-press feel. */
+[data-theme="tabloid"] {
+  --c-bg: #f3f0e6;
+  --c-bg2: #e6e2d2;
+  --c-paper: #fdfbf2;
+  --c-ink: #0a0a0a;
+  --c-ink-soft: #2a2a2a;
+  --c-dim: #545454;
+  --c-faint: #9a9a9a;
+  --c-rule: rgba(0, 0, 0, 0.14);
+  --c-rule-strong: rgba(0, 0, 0, 0.5);
+  --c-burgundy: #c81020;
+  --c-denim: #163a6e;
+  --c-mustard: #d49a00;
+  --c-forest: #1d6e36;
+  --c-brick: #c81020;
+  --c-navy: #0a0a0a;
+  --c-push: #d49a00;
+
+  --font-display: 'Alfa Slab One';
+}
+
+/* Auto-apply Stadium for dark-mode users who haven't picked a theme.
+   The :not selector means "don't override an explicit choice." */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --c-bg: #162017;
     --c-bg2: #1c2a1f;
     --c-paper: #1f2e22;
@@ -62,6 +117,8 @@ html, body {
   font-family: var(--font-body), serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* Smooth theme transition so the swap feels intentional, not jarring. */
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 /* Safe-area padding for the bottom tab nav on iOS PWAs. */
