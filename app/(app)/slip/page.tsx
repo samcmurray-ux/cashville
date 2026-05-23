@@ -297,7 +297,9 @@ export default function SlipPage() {
           <Stat
             label={isCurrent ? "Fund jumps to" : "Fund after"}
             value={fmtMoney(
-              bd.trip.current + (isCurrent ? 70 * week.combinedOdds - 70 : 0),
+              // Gross return adds to the pot — the lads consider the full
+              // bookies' payout (stake + winnings) as the pot's intake.
+              bd.trip.current + (isCurrent ? 70 * week.combinedOdds : 0),
             )}
             valueColor="var(--c-mustard)"
             sub="vs €10k"
