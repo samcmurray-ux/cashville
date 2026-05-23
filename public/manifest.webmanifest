@@ -1,0 +1,19 @@
+{
+  "name": "Ca$hville Tracker",
+  "short_name": "Ca$hville",
+  "description": "Seven lads, one slip a week, the long road to Nashville.",
+  "start_url": "/slip",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#efe6d4",
+  "theme_color": "#efe6d4",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

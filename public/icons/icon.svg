@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#efe6d4"/>
+  <!-- Postmark-style outer dashed ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#8c2334" stroke-width="6" stroke-dasharray="14 10"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#8c2334" stroke-width="2"/>
+  <!-- Wordmark — Ca$h on one line -->
+  <text x="256" y="282" font-family="Georgia, 'DM Serif Display', serif" font-size="160" font-style="italic" font-weight="400" text-anchor="middle">
+    <tspan fill="#8c2334">Ca</tspan><tspan fill="#c89216">$</tspan><tspan fill="#8c2334">h</tspan>
+  </text>
+  <!-- Sub label -->
+  <text x="256" y="360" font-family="'Courier New', monospace" font-size="22" letter-spacing="6" fill="#6f6555" text-anchor="middle">VILLE · BNA</text>
+</svg>
