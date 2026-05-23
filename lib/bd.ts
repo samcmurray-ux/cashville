@@ -101,7 +101,12 @@ export function buildView(raw: Raw): BD {
       week: w.week_number,
       date: w.week_date,
       picks,
-      combinedOdds: w.combined_odds != null ? +w.combined_odds : +combined.toFixed(2),
+      // Always use the locally-computed combined odds — `picks.odds` is the
+      // source of truth. The DB's `combined_odds` column is just a cache that
+      // setPickResult / settleWeek refresh at settle-time, and it defaults
+      // to 1 on a fresh week-insert (which would otherwise hide the live
+      // total until someone settled).
+      combinedOdds: +combined.toFixed(2),
       stake: w.stake_per_acca ?? 70,
       payout: +(w.payout ?? 0),
       accaWon: !!w.acca_won,
