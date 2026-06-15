@@ -1,9 +1,11 @@
 "use client";
 
-// Records — the deep-cuts tab. Six sections, top-to-bottom:
+// Records — the deep-cuts tab. Eight sections, top-to-bottom:
+//   MVP              · win rate × avg winning odds, ranked
 //   Current Form     · active streak + last-5 strip
 //   Near-Misses      · group heartbreak — one leg away X times
 //   Cost to the Group · every loss, missed payout split among the losers
+//   Contribution     · every win, payout split among winners by odds
 //   Sport Specialist · best & cursed sport per lad
 //   Hall of Fame     · the winning accas, ranked
 //   Season Form      · cumulative hit-rate line chart
@@ -16,10 +18,12 @@ import { WeekDetailSheet } from "@/components/week-detail-sheet";
 import { fmtMoney } from "@/lib/bd";
 import type { Player } from "@/lib/types";
 import {
+  computeContribution,
   computeCumulative,
   computeForm,
   computeGroupCost,
   computeHallOfFame,
+  computeMVP,
   computeNearMisses,
   computeSportSpecialist,
 } from "@/lib/stats";
@@ -31,9 +35,11 @@ export default function RecordsPage() {
   const data = useMemo(() => {
     if (!bd) return null;
     return {
+      mvp: computeMVP(bd),
       form: computeForm(bd),
       near: computeNearMisses(bd),
       groupCost: computeGroupCost(bd),
+      contribution: computeContribution(bd),
       sport: computeSportSpecialist(bd),
       hall: computeHallOfFame(bd),
       cumulative: computeCumulative(bd),
@@ -47,6 +53,71 @@ export default function RecordsPage() {
 
   return (
     <div className="px-4 py-4 space-y-4">
+      {/* ─── MVP ─────────────────────────────────────────────── */}
+      <Card accent="var(--c-mustard)">
+        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+          <Eyebrow color="var(--c-mustard)">MVP Rankings</Eyebrow>
+          <Headline size={32}>Most valuable lad</Headline>
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            win rate × how juicy your wins are ↓
+          </Scribble>
+        </div>
+        <div>
+          {data.mvp.map((r, i) => (
+            <div
+              key={r.player.id}
+              className="px-4 py-3 flex items-center gap-3"
+              style={{ borderTop: i === 0 ? "none" : "1px solid var(--c-rule)" }}
+            >
+              <div
+                className="font-mono shrink-0"
+                style={{
+                  fontSize: 14,
+                  color: i === 0 ? "var(--c-mustard)" : "var(--c-faint)",
+                  fontWeight: 600,
+                  width: 22,
+                }}
+              >
+                {i + 1}
+              </div>
+              <Avatar player={r.player} size={34} ring={i === 0 ? "var(--c-mustard)" : undefined} />
+              <div className="min-w-0 flex-1">
+                <div
+                  className="font-display"
+                  style={{ fontSize: 17, color: "var(--c-ink)", lineHeight: 1.1 }}
+                >
+                  {r.player.name}
+                </div>
+                <div
+                  className="font-mono uppercase"
+                  style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--c-dim)", marginTop: 1 }}
+                >
+                  {Math.round(r.hitRate * 100)}% hit · win avg @{r.avgWinOdds.toFixed(2)}
+                </div>
+              </div>
+              <div
+                className="font-display text-right shrink-0"
+                style={{
+                  fontSize: 24,
+                  color: i === 0 ? "var(--c-mustard)" : "var(--c-ink)",
+                  lineHeight: 1,
+                }}
+              >
+                {r.score.toFixed(2)}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="px-5 py-2.5" style={{ borderTop: "1px solid var(--c-rule)" }}>
+          <p
+            className="font-mono"
+            style={{ fontSize: 9, color: "var(--c-faint)", letterSpacing: "0.1em" }}
+          >
+            score = hit rate × average winning odds · higher is better
+          </p>
+        </div>
+      </Card>
+
       {/* ─── Current Form ────────────────────────────────────── */}
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
@@ -201,11 +272,12 @@ export default function RecordsPage() {
         </div>
         <div className="px-5 py-4">
           {data.groupCost.rows.map((r) => (
-            <CostBar
+            <MoneyBar
               key={r.player.id}
               player={r.player}
-              cost={r.cost}
+              value={r.cost}
               max={data.groupCost.rows[0]?.cost || 1}
+              color="var(--c-burgundy)"
             />
           ))}
           <p
@@ -215,6 +287,48 @@ export default function RecordsPage() {
             gross payout missed, split equally between each week's losers
           </p>
         </div>
+      </Card>
+
+      {/* ─── Contribution to Winnings ────────────────────────── */}
+      <Card accent="var(--c-forest)">
+        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+          <Eyebrow color="var(--c-forest)">Contribution to Winnings</Eyebrow>
+          <Headline size={32}>Who brought it home</Headline>
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            winning weeks only, split by odds ↓
+          </Scribble>
+          <div
+            className="font-mono uppercase mt-2"
+            style={{ fontSize: 10, letterSpacing: "0.16em", color: "var(--c-dim)" }}
+          >
+            {fmtMoney(data.contribution.totalWon)} banked across {data.contribution.weeksWon} winning weeks
+          </div>
+        </div>
+        {data.contribution.weeksWon === 0 ? (
+          <div className="px-5 py-6 text-center">
+            <Scribble color="var(--c-burgundy)" size={20} rotate={-1}>
+              no wins yet — nothing to share out
+            </Scribble>
+          </div>
+        ) : (
+          <div className="px-5 py-4">
+            {data.contribution.rows.map((r) => (
+              <MoneyBar
+                key={r.player.id}
+                player={r.player}
+                value={r.contribution}
+                max={data.contribution.rows[0]?.contribution || 1}
+                color="var(--c-forest)"
+              />
+            ))}
+            <p
+              className="font-mono mt-2"
+              style={{ fontSize: 9, color: "var(--c-faint)", letterSpacing: "0.1em" }}
+            >
+              gross payout, split by each winner's odds ÷ the week's total odds
+            </p>
+          </div>
+        )}
       </Card>
 
       {/* ─── Sport Specialist ────────────────────────────────── */}
@@ -360,20 +474,23 @@ export default function RecordsPage() {
   );
 }
 
-// One ranked bar in Cost to the Group. Bar length = cost/max (worst lad fills
-// the track). Zero-cost lads dim with an empty track.
-function CostBar({
+// One ranked € bar — used by both Cost to the Group (burgundy) and
+// Contribution to Winnings (forest). Bar length = value/max (leader fills the
+// track). Zero-value lads dim with an empty track.
+function MoneyBar({
   player,
-  cost,
+  value,
   max,
+  color,
 }: {
   player: Player;
-  cost: number;
+  value: number;
   max: number;
+  color: string;
 }) {
-  const pct = max > 0 ? (cost / max) * 100 : 0;
+  const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex items-center gap-2 py-1" style={{ opacity: cost === 0 ? 0.45 : 1 }}>
+    <div className="flex items-center gap-2 py-1" style={{ opacity: value === 0 ? 0.45 : 1 }}>
       <Avatar player={player} size={22} />
       <span
         className="font-mono"
@@ -385,13 +502,13 @@ function CostBar({
         className="flex-1 overflow-hidden"
         style={{ height: 14, background: "var(--c-rule)", borderRadius: 2 }}
       >
-        <div style={{ width: `${pct}%`, height: "100%", background: "var(--c-burgundy)" }} />
+        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
       </div>
       <span
         className="font-display text-right"
         style={{ fontSize: 14, width: 56, color: "var(--c-ink)", lineHeight: 1 }}
       >
-        {fmtMoney(cost)}
+        {fmtMoney(value)}
       </span>
     </div>
   );

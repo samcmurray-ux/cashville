@@ -634,3 +634,66 @@ export function computeGroupCost(bd: BD): {
     .sort((a, b) => b.cost - a.cost);
   return { rows, totalCost: Math.round(totalCost), weeksLost: weeksLostCount };
 }
+
+// MVP ranking — win rate × average WINNING odds. A single "value index":
+// how often you land × how juicy your wins are. Higher = more valuable.
+export type MvpRow = {
+  player: Player;
+  hitRate: number;
+  avgWinOdds: number;
+  score: number;
+};
+
+export function computeMVP(bd: BD): MvpRow[] {
+  return computePlayerStats(bd)
+    .map((s) => ({
+      player: s.player,
+      hitRate: s.hitRate,
+      avgWinOdds: s.avgWinOdds,
+      score: +(s.hitRate * s.avgWinOdds).toFixed(3),
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
+// Contribution to Winnings — the mirror of Cost to the Group. For each
+// WINNING week, split the gross payout (stake × combined odds) across the 7
+// winners PROPORTIONAL TO ODDS (your odds ÷ the week's total odds). Sum per
+// lad = how much of the pot's winnings each lad actually brought in.
+export type ContribRow = {
+  player: Player;
+  contribution: number;
+  weeksWon: number;
+};
+
+export function computeContribution(bd: BD): {
+  rows: ContribRow[];
+  totalWon: number;
+  weeksWon: number;
+} {
+  const tally: Record<string, { amt: number; weeks: number }> = {};
+  let totalWon = 0;
+  let weeksWonCount = 0;
+  for (const w of bd.weeks) {
+    if (!w.accaWon) continue;
+    const winners = w.picks.filter((p) => p.result === "Won" && p.odds);
+    const sumOdds = winners.reduce((a, p) => a + (p.odds || 0), 0);
+    if (sumOdds <= 0) continue;
+    const payout = (w.stake || 70) * w.combinedOdds; // gross
+    totalWon += payout;
+    weeksWonCount++;
+    for (const p of winners) {
+      const share = payout * ((p.odds || 0) / sumOdds);
+      const t = (tally[p.playerId] ||= { amt: 0, weeks: 0 });
+      t.amt += share;
+      t.weeks++;
+    }
+  }
+  const rows = bd.players
+    .map((player) => ({
+      player,
+      contribution: Math.round(tally[player.id]?.amt || 0),
+      weeksWon: tally[player.id]?.weeks || 0,
+    }))
+    .sort((a, b) => b.contribution - a.contribution);
+  return { rows, totalWon: Math.round(totalWon), weeksWon: weeksWonCount };
+}
