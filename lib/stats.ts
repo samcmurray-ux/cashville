@@ -149,6 +149,16 @@ const SLAG: Record<string, string[]> = {
     "Wakes up at 7am for the Bundesliga.",
     "His Christmas tree is in Bayern colours.",
   ],
+  reliable: [
+    "Never lets the lads down.",
+    "Steady hands when it counts.",
+    "The one you'd actually trust with the slip.",
+  ],
+  comeback: [
+    "Down one week, hero the next.",
+    "Bounces back like a bad penny.",
+    "You can't keep a good man down. Or this fella.",
+  ],
 };
 
 function pickSlag(key: string): string {
@@ -201,6 +211,28 @@ export function computeAwards(bd: BD, stats: PlayerStats[]): Award[] {
   const cardWinner = stats.find((s) => s.player.id === cardKing.player.id)!;
   const bayernWinner = stats.find((s) => s.player.id === bayernKing.player.id)!;
 
+  // Mr Reliable — longest winning streak (already on PlayerStats).
+  const byStreak = [...stats].sort((a, b) => b.longestWin - a.longestWin);
+
+  // Comeback King — most times a loss was followed straight by a win, walking
+  // each lad's win/loss sequence (pushes/skips dropped, so a L→(skip)→W still
+  // counts as a bounce-back).
+  const ordered = [...bd.weeks].filter((w) => w.filled).sort((a, b) => a.week - b.week);
+  const comebacks = bd.players
+    .map((player) => {
+      const seq = ordered
+        .map((w) => w.picks.find((p) => p.playerId === player.id)?.result)
+        .filter((r): r is "Won" | "Lost" => r === "Won" || r === "Lost");
+      let count = 0;
+      for (let i = 1; i < seq.length; i++) {
+        if (seq[i] === "Won" && seq[i - 1] === "Lost") count++;
+      }
+      return { player, count };
+    })
+    .sort((a, b) => b.count - a.count);
+  const comebackKing = comebacks[0];
+  const comebackWinner = stats.find((s) => s.player.id === comebackKing.player.id)!;
+
   return [
     {
       key: "banker",
@@ -249,6 +281,22 @@ export function computeAwards(bd: BD, stats: PlayerStats[]): Award[] {
       value: `${bayernKing.count} Bayern bets`,
       slag: pickSlag("bayernBoy"),
       color: "var(--c-brick)",
+    },
+    {
+      key: "reliable",
+      title: "Mr Reliable",
+      winner: byStreak[0],
+      value: `${byStreak[0].longestWin}-win streak`,
+      slag: pickSlag("reliable"),
+      color: "var(--c-forest)",
+    },
+    {
+      key: "comeback",
+      title: "Comeback King",
+      winner: comebackWinner,
+      value: `${comebackKing.count} comebacks`,
+      slag: pickSlag("comeback"),
+      color: "var(--c-denim)",
     },
   ];
 }
