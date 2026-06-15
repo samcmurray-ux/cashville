@@ -2,7 +2,7 @@
 
 // Stats — the banter screen. Six sections, top-to-bottom:
 //   Pecking Order  · who's hitting and who isn't
-//   Honours Wall   · 6 auto-computed awards w/ slag copy
+//   Honours Wall   · auto-computed awards w/ slag copy
 //   Damage Report  · per-lad W/L/P stacked bars
 //   Blame Game     · solo kills + € cost per lad (two mini charts)
 //   Heat Strip     · rows = lads, cols = weeks, colored W/L/P cells
@@ -158,7 +158,9 @@ export default function StatsPage() {
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
           <Eyebrow color="var(--c-mustard)">Honours List</Eyebrow>
-          <Headline size={32}>Six trophies, six convictions</Headline>
+          {/* Count derives from the awards array so it never goes stale when
+              we add or remove an award. */}
+          <Headline size={32}>{awards.length} trophies, {awards.length} convictions</Headline>
         </div>
         <div className="grid grid-cols-2">
           {awards.map((a, i) => (
