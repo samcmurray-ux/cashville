@@ -5,7 +5,7 @@
 //   Current Form     · active streak + last-5 strip
 //   Near-Misses      · group heartbreak — one leg away X times
 //   Cost to the Group · every loss, missed payout split among the losers
-//   Sport Specialist · best & cursed sport per lad
+//   Sport Specialist · best & cursed sport per player
 //   Hall of Fame     · the winning accas, ranked
 //   Season Form      · cumulative hit-rate line chart
 
@@ -54,7 +54,7 @@ export default function RecordsPage() {
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
           <Eyebrow color="var(--c-mustard)">MVP Rankings</Eyebrow>
-          <Headline size={32}>Most valuable lad</Headline>
+          <Headline size={32}>Most valuable player</Headline>
           <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
             win rate × how juicy your wins are ↓
           </Scribble>
@@ -431,7 +431,7 @@ export default function RecordsPage() {
 
 // One ranked € bar (used by Cost to the Group). Takes a color so it can be
 // reused elsewhere. Bar length = value/max (leader fills the track).
-// Zero-value lads dim with an empty track.
+// Zero-value players dim with an empty track.
 function MoneyBar({
   player,
   value,

@@ -24,7 +24,7 @@ export function ThemePicker({
               key={t.id}
               onClick={() => {
                 setThemeId(t.id as ThemeId);
-                // Tiny pause so the lad sees the swap before the sheet closes.
+                // Tiny pause so the player sees the swap before the sheet closes.
                 setTimeout(onClose, 220);
               }}
               className="flex items-center gap-3 p-3 w-full text-left"

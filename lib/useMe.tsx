@@ -1,7 +1,7 @@
 "use client";
 
 // "Who am I?" — the player-picker stand-in for v1 auth.
-// Persists to localStorage so the lad doesn't re-pick every visit.
+// Persists to localStorage so the player doesn't re-pick every visit.
 // v1.1 swaps this out for Supabase magic-link auth (the email allowlist + RLS
 // in supabase/migration.sql is already written for it).
 

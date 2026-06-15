@@ -13,9 +13,9 @@ export type PlayerStats = {
   avgOdds: number;        // mean of all picks' odds
   avgWinOdds: number;     // mean of WINNING picks' odds only
   biggestOdds: number;
-  soloKills: number; // weeks where this lad was the only loser
+  soloKills: number; // weeks where this player was the only loser
   soloKillCost: number; // gross payout the group missed across his solo kills
-  heroPicks: number; // weeks where the acca won and this lad's pick contributed
+  heroPicks: number; // weeks where the acca won and this player's pick contributed
   longestWin: number;
   longestLose: number;
   punishmentPaid: number;
@@ -34,7 +34,7 @@ export function computePlayerStats(bd: BD): PlayerStats[] {
     const avg = odds.length ? odds.reduce((a, b) => a + b, 0) / odds.length : 0;
     const biggest = odds.length ? Math.max(...odds) : 0;
     // Avg odds across WINNING picks only — measures "how juicy are the
-    // bets this lad actually lands?" A high number = they win big when
+    // bets this player actually lands?" A high number = they win big when
     // they win; low = they only land short-price bankers.
     const wonOdds = won.filter((p) => p.odds).map((p) => p.odds!);
     const avgWin = wonOdds.length
@@ -131,7 +131,7 @@ const SLAG: Record<string, string[]> = {
   soloKill: [
     "One job. Truly, one job.",
     "Singlehandedly torched the slip.",
-    "Cost the lads a small house deposit.",
+    "Cost the players a small house deposit.",
     "Personally responsible. Should be paying back.",
   ],
   biggestPunter: [
@@ -150,7 +150,7 @@ const SLAG: Record<string, string[]> = {
     "His Christmas tree is in Bayern colours.",
   ],
   reliable: [
-    "Never lets the lads down.",
+    "Never lets the players down.",
     "Steady hands when it counts.",
     "The one you'd actually trust with the slip.",
   ],
@@ -183,7 +183,7 @@ export function computeAwards(bd: BD, stats: PlayerStats[]): Award[] {
   const byKills = [...stats].sort((a, b) => b.soloKills - a.soloKills);
   const byAvg = [...stats].sort((a, b) => b.avgOdds - a.avgOdds);
 
-  // Count card-ish picks per lad
+  // Count card-ish picks per player
   const cardCounts = bd.players.map((player) => ({
     player,
     count: bd.weeks
@@ -194,7 +194,7 @@ export function computeAwards(bd: BD, stats: PlayerStats[]): Award[] {
   }));
   const cardKing = [...cardCounts].sort((a, b) => b.count - a.count)[0];
 
-  // Count Bayern picks per lad
+  // Count Bayern picks per player
   const bayernCounts = bd.players.map((player) => ({
     player,
     count: bd.weeks
@@ -215,7 +215,7 @@ export function computeAwards(bd: BD, stats: PlayerStats[]): Award[] {
   const byStreak = [...stats].sort((a, b) => b.longestWin - a.longestWin);
 
   // Comeback King — most times a loss was followed straight by a win, walking
-  // each lad's win/loss sequence (pushes/skips dropped, so a L→(skip)→W still
+  // each player's win/loss sequence (pushes/skips dropped, so a L→(skip)→W still
   // counts as a bounce-back).
   const ordered = [...bd.weeks].filter((w) => w.filled).sort((a, b) => a.week - b.week);
   const comebacks = bd.players
@@ -325,7 +325,7 @@ export function computeHeatStrip(bd: BD): Array<{ player: Player; cells: HeatCel
   }));
 }
 
-// ─── Pick Mix — sport breakdown per lad ─────────────────────────────────
+// ─── Pick Mix — sport breakdown per player ─────────────────────────────────
 export function computePickMix(bd: BD): Array<{
   player: Player;
   total: number;
@@ -372,7 +372,7 @@ export function heatColor(result: HeatCell["result"]): string {
 const SINGLE_STAKE = 10; // hypothetical €10 single per pick for ROI
 
 // ROI — "if you'd backed your own picks as €10 singles." The realest punter
-// metric: would this lad be up or down betting only himself?
+// metric: would this player be up or down betting only himself?
 export type RoiRow = {
   player: Player;
   staked: number;
@@ -491,7 +491,7 @@ export function computeNearMisses(bd: BD): {
   };
 }
 
-// Sport specialist — per-lad hit rate by sport. Surfaces a best ("golden")
+// Sport specialist — per-player hit rate by sport. Surfaces a best ("golden")
 // and worst ("cursed") sport, requiring a minimum sample so a 1/1 fluke
 // doesn't crown someone.
 const MIN_SPORT_SAMPLE = 3;
@@ -563,7 +563,7 @@ export function computeHallOfFame(bd: BD): HallEntry[] {
     .sort((a, b) => b.combinedOdds - a.combinedOdds);
 }
 
-// Cumulative form — running hit rate over the season, one series per lad,
+// Cumulative form — running hit rate over the season, one series per player,
 // for the multi-line chart. Hit rate only advances on settled (W/L) picks.
 export type CumulativeSeries = {
   player: Player;
@@ -594,9 +594,9 @@ export function computeCumulative(bd: BD): {
 
 // Cost to the Group — for EVERY lost week (acca didn't land, ≥1 loser), take
 // the gross payout the group missed (stake × combined odds) and split it
-// EQUALLY among that week's losers. Sum per lad = total damage they're on the
+// EQUALLY among that week's losers. Sum per player = total damage they're on the
 // hook for. Unlike the Blame Game (sole kills only, full amount), this catches
-// the lads who quietly lose in every group bloodbath.
+// the players who quietly lose in every group bloodbath.
 export type GroupCostRow = {
   player: Player;
   cost: number; // total € share of missed payouts
@@ -658,7 +658,7 @@ export function computeMVP(bd: BD): MvpRow[] {
 // Contribution to Winnings — the mirror of Cost to the Group. For each
 // WINNING week, split the gross payout (stake × combined odds) across the 7
 // winners PROPORTIONAL TO ODDS (your odds ÷ the week's total odds). Sum per
-// lad = how much of the pot's winnings each lad actually brought in.
+// player = how much of the pot's winnings each player actually brought in.
 export type ContribRow = {
   player: Player;
   contribution: number;

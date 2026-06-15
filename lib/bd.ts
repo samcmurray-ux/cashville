@@ -83,7 +83,7 @@ export function buildView(raw: Raw): BD {
     });
     // Combined odds: multiply each filled pick that has odds. We include
     // unsettled-but-filled picks too so the current week's combined updates
-    // live as the lads enter their picks. (The prototype only counts Won|Lost,
+    // live as the players enter their picks. (The prototype only counts Won|Lost,
     // which makes the live slip stuck at 1.00.) Push doesn't affect combined.
     let combined = 1;
     for (const p of picks) {
@@ -119,7 +119,7 @@ export function buildView(raw: Raw): BD {
 
   // Current week = first week that's either (a) empty waiting for picks, or
   // (b) has picks but isn't fully settled. A week with 7 filled picks but
-  // no results yet is THE live slip — that's what the lads work on between
+  // no results yet is THE live slip — that's what the players work on between
   // kickoff and full-time. Only weeks where every filled pick has a result
   // count as "done" and roll past.
   let currentWeekNum: number | null = null;

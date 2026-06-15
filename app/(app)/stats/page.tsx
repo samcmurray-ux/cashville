@@ -3,10 +3,10 @@
 // Stats — the banter screen. Six sections, top-to-bottom:
 //   Pecking Order  · who's hitting and who isn't
 //   Honours Wall   · auto-computed awards w/ slag copy
-//   Damage Report  · per-lad W/L/P stacked bars
-//   Blame Game     · solo kills + € cost per lad (two mini charts)
-//   Heat Strip     · rows = lads, cols = weeks, colored W/L/P cells
-//   Pick Mix       · per-lad sport breakdown donut
+//   Damage Report  · per-player W/L/P stacked bars
+//   Blame Game     · solo kills + € cost per player (two mini charts)
+//   Heat Strip     · rows = players, cols = weeks, colored W/L/P cells
+//   Pick Mix       · per-player sport breakdown donut
 
 import { useMemo } from "react";
 import { useBD } from "@/lib/useBD";
@@ -105,7 +105,7 @@ export default function StatsPage() {
                   <Chip color="var(--c-burgundy)" small>{r.losses}L</Chip>
                   {r.pushes > 0 && <Chip color="var(--c-push)" small>{r.pushes}P</Chip>}
                   {/* Avg odds across winning picks — "how juicy are your
-                      wins?". Hidden if the lad has no wins yet (would be 0.00). */}
+                      wins?". Hidden if the player has no wins yet (would be 0.00). */}
                   {r.avgWinOdds > 0 && (
                     <span
                       className="font-mono"
@@ -407,7 +407,7 @@ export default function StatsPage() {
       <Card accent="var(--c-denim)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
           <Eyebrow color="var(--c-denim)">Pick Mix</Eyebrow>
-          <Headline size={32}>What each lad bets on</Headline>
+          <Headline size={32}>What each player bets on</Headline>
         </div>
         <div className="px-4 py-3 grid grid-cols-2 gap-3">
           {mix.map((m) => {
@@ -467,9 +467,9 @@ export default function StatsPage() {
   );
 }
 
-// One ranked bar in the Blame Game charts. Bar length is value/max; the lad
+// One ranked bar in the Blame Game charts. Bar length is value/max; the player
 // with the most kills (or biggest € cost) fills the whole track. Zero-value
-// lads render dimmed with an empty track so the innocent are visible too.
+// players render dimmed with an empty track so the innocent are visible too.
 function BlameBar({
   player,
   value,

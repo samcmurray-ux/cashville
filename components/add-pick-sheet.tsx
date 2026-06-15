@@ -113,7 +113,7 @@ export function AddPickSheet({
   };
 
   // Title makes it crystal clear whose pick on which week you're editing —
-  // important now that any lad can edit any other lad's row.
+  // important now that any player can edit any other player's row.
   const titleAction = existing?.filled ? "Edit" : "Add";
   const whose = playerName ? `${playerName}'s pick` : "pick";
   const title = `${titleAction} ${whose} · Week ${weekNum}`;
@@ -332,7 +332,7 @@ export function AddPickSheet({
 }
 
 // Crude reverse-hint for decimal → fractional, just for the right-side label.
-// We don't store this — it's only a "by the way" preview for the lad.
+// We don't store this — it's only a "by the way" preview for the player.
 function fractionalHint(decimal: number): string {
   const f = decimal - 1;
   if (f <= 0) return "";

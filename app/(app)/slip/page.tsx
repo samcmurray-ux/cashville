@@ -40,7 +40,7 @@ export default function SlipPage() {
   const wkNum = selected ?? bd.currentWeekNum;
   const week = bd.weeks.find((w) => w.week === wkNum) ?? bd.currentWeek;
   // "Current" simply = this is the active week in the season. A week with
-  // 7 picks but no results yet is still current (the lads are awaiting
+  // 7 picks but no results yet is still current (the players are awaiting
   // kickoff / waiting for full-time). It rolls past only once someone settles.
   const isCurrent = week.week === bd.currentWeekNum;
   const entered = week.picks.filter((p) => p.filled).length;
@@ -97,7 +97,7 @@ export default function SlipPage() {
               <div className="mt-1">
                 {isCurrent ? (
                   <Scribble color="var(--c-dim)" size={20} rotate={-2}>
-                    get yours in lads ↓
+                    get your picks in ↓
                   </Scribble>
                 ) : week.accaWon ? (
                   <Scribble color="var(--c-forest)" size={20} rotate={-1.5}>
@@ -297,7 +297,7 @@ export default function SlipPage() {
           <Stat
             label={isCurrent ? "Fund jumps to" : "Fund after"}
             value={fmtMoney(
-              // Gross return adds to the pot — the lads consider the full
+              // Gross return adds to the pot — the players consider the full
               // bookies' payout (stake + winnings) as the pot's intake.
               bd.trip.current + (isCurrent ? 70 * week.combinedOdds : 0),
             )}

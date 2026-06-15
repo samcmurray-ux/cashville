@@ -1,6 +1,6 @@
 "use client";
 
-// First-run identity picker. Locks the lad in via localStorage so the rest
+// First-run identity picker. Locks the player in via localStorage so the rest
 // of the app knows "this is your row, this is the Add my pick button."
 // Hidden behind a Switch button in the header once chosen.
 

@@ -23,7 +23,7 @@ export function SlipRow({
   isMe: boolean;
   isCurrent: boolean;
   onAdd?: () => void;
-  // Per-pick settle. Called when the lad taps W/L/P inline. Pass `null` to
+  // Per-pick settle. Called when the player taps W/L/P inline. Pass `null` to
   // clear back to unsettled. Parent handles the actual DB write + reload
   // via setPickResult in lib/bd.ts (which also auto-rolls up the week if
   // this is the 7th settle).

@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/lib/useTheme";
 
 export const metadata: Metadata = {
   title: "Ca$hville Tracker",
-  description: "Seven lads, one slip a week, the long road to Nashville.",
+  description: "Seven players, one slip a week, the long road to Nashville.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

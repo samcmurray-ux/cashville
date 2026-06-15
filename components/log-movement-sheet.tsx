@@ -1,6 +1,6 @@
 "use client";
 
-// Log Movement bottom sheet — any €in or €out the lads agreed in the chat.
+// Log Movement bottom sheet — any €in or €out the players agreed in the chat.
 // Types match the migration check constraint: win | forfeit | bonus | adjust.
 
 import { useState } from "react";

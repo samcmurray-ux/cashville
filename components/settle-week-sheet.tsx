@@ -77,7 +77,7 @@ export function SettleWeekSheet({
 
   const submit = async () => {
     setError(null);
-    if (!allPicked) return setError("Mark every lad first — W, L or P");
+    if (!allPicked) return setError("Mark every player first — W, L or P");
     setSaving(true);
     try {
       await settleWeek({

@@ -1,7 +1,7 @@
 "use client";
 
 // Multi-line SVG chart for cumulative hit rate over the season — one line
-// per lad in their avatar hue. Tap a name in the legend to isolate that
+// per player in their avatar hue. Tap a name in the legend to isolate that
 // line (dims the rest). No chart library; hand-drawn polylines.
 
 import { useState } from "react";
@@ -77,7 +77,7 @@ export function CumulativeChart({
           </text>
         ))}
 
-        {/* One polyline per lad */}
+        {/* One polyline per player */}
         {series.map((s) => {
           const hue = s.player.hue;
           const color = `oklch(0.58 0.14 ${hue})`;

@@ -51,7 +51,7 @@ export default function PotPage() {
                 rotate={-1.5}
                 style={{ marginTop: 4 }}
               >
-                {pct >= 50 ? "halfway there, lads" : "still climbing"}
+                {pct >= 50 ? "halfway there, players" : "still climbing"}
               </Scribble>
             </div>
             <Postmark
