@@ -316,3 +316,230 @@ export function heatColor(result: HeatCell["result"]): string {
       return "var(--c-rule)";
   }
 }
+
+// ─── Records-tab computations ───────────────────────────────────────────
+// All of these are pure derivations over the BD view, same as the rest of
+// this file. They power the deep-cuts "Records" tab.
+
+const SINGLE_STAKE = 10; // hypothetical €10 single per pick for ROI
+
+// ROI — "if you'd backed your own picks as €10 singles." The realest punter
+// metric: would this lad be up or down betting only himself?
+export type RoiRow = {
+  player: Player;
+  staked: number;
+  returned: number;
+  profit: number; // returned - staked (can be negative)
+  roiPct: number; // profit / staked * 100
+  bets: number;
+};
+
+export function computeROI(bd: BD): RoiRow[] {
+  return bd.players
+    .map((player) => {
+      const bets = bd.weeks
+        .filter((w) => w.filled)
+        .map((w) => w.picks.find((p) => p.playerId === player.id))
+        .filter(
+          (p): p is NonNullable<typeof p> =>
+            !!p &&
+            p.filled &&
+            !!p.odds &&
+            (p.result === "Won" || p.result === "Lost"),
+        );
+      const staked = bets.length * SINGLE_STAKE;
+      const returned = bets.reduce(
+        (acc, p) => acc + (p.result === "Won" ? SINGLE_STAKE * (p.odds || 0) : 0),
+        0,
+      );
+      const profit = returned - staked;
+      return {
+        player,
+        staked,
+        returned: Math.round(returned),
+        profit: Math.round(profit),
+        roiPct: staked > 0 ? +((profit / staked) * 100).toFixed(0) : 0,
+        bets: bets.length,
+      };
+    })
+    .sort((a, b) => b.profit - a.profit);
+}
+
+// Current form — most-recent results + the active streak right now.
+export type FormRow = {
+  player: Player;
+  last5: Array<"Won" | "Lost" | "Push">; // oldest→newest of the last 5
+  streakType: "Won" | "Lost" | null;
+  streakLen: number; // length of the current run of the same result
+};
+
+export function computeForm(bd: BD): FormRow[] {
+  const ordered = [...bd.weeks].filter((w) => w.filled).sort((a, b) => a.week - b.week);
+  return bd.players.map((player) => {
+    const results = ordered
+      .map((w) => w.picks.find((p) => p.playerId === player.id)?.result)
+      .filter(
+        (r): r is "Won" | "Lost" | "Push" =>
+          r === "Won" || r === "Lost" || r === "Push",
+      );
+    const last5 = results.slice(-5);
+
+    // Active streak: walk backwards from the newest. Push breaks the streak.
+    let streakType: "Won" | "Lost" | null = null;
+    let streakLen = 0;
+    for (let i = results.length - 1; i >= 0; i--) {
+      const r = results[i];
+      if (r === "Push") break;
+      if (streakType === null) {
+        streakType = r;
+        streakLen = 1;
+      } else if (r === streakType) {
+        streakLen++;
+      } else {
+        break;
+      }
+    }
+    return { player, last5, streakType, streakLen };
+  });
+}
+
+// Near-misses — group heartbreak. Weeks the acca didn't win but exactly one
+// leg failed (= the sole-kill weeks). Plus the total € left on the table.
+export type NearMiss = {
+  week: number;
+  date: string;
+  combinedOdds: number;
+  payoutMissed: number;
+  culprit: Player | null;
+  culpritPick: string;
+};
+
+export function computeNearMisses(bd: BD): {
+  count: number;
+  totalMissed: number;
+  weeks: NearMiss[];
+} {
+  const weeks: NearMiss[] = [];
+  for (const w of bd.weeks) {
+    if (!w.filled || w.accaWon) continue;
+    const losers = w.picks.filter((p) => p.result === "Lost");
+    if (losers.length !== 1) continue;
+    const culpritPick = losers[0];
+    const culprit = bd.players.find((p) => p.id === culpritPick.playerId) ?? null;
+    weeks.push({
+      week: w.week,
+      date: w.date,
+      combinedOdds: w.combinedOdds,
+      payoutMissed: Math.round((w.stake || 70) * w.combinedOdds),
+      culprit,
+      culpritPick: culpritPick.sel,
+    });
+  }
+  weeks.sort((a, b) => b.payoutMissed - a.payoutMissed);
+  return {
+    count: weeks.length,
+    totalMissed: weeks.reduce((a, w) => a + w.payoutMissed, 0),
+    weeks,
+  };
+}
+
+// Sport specialist — per-lad hit rate by sport. Surfaces a best ("golden")
+// and worst ("cursed") sport, requiring a minimum sample so a 1/1 fluke
+// doesn't crown someone.
+const MIN_SPORT_SAMPLE = 3;
+
+export type SportRow = {
+  player: Player;
+  best: { sport: string; rate: number; won: number; played: number } | null;
+  cursed: { sport: string; rate: number; won: number; played: number } | null;
+};
+
+export function computeSportSpecialist(bd: BD): SportRow[] {
+  return bd.players.map((player) => {
+    const bySport: Record<string, { won: number; played: number }> = {};
+    for (const w of bd.weeks) {
+      if (!w.filled) continue;
+      const p = w.picks.find((x) => x.playerId === player.id);
+      if (!p || !p.filled || !p.sport) continue;
+      if (p.result !== "Won" && p.result !== "Lost") continue; // ignore push/unsettled
+      const slot = (bySport[p.sport] ||= { won: 0, played: 0 });
+      slot.played++;
+      if (p.result === "Won") slot.won++;
+    }
+    const qualified = Object.entries(bySport)
+      .filter(([, v]) => v.played >= MIN_SPORT_SAMPLE)
+      .map(([sport, v]) => ({
+        sport,
+        rate: v.won / v.played,
+        won: v.won,
+        played: v.played,
+      }));
+    if (!qualified.length) return { player, best: null, cursed: null };
+    const sorted = [...qualified].sort((a, b) => b.rate - a.rate);
+    return {
+      player,
+      best: sorted[0],
+      cursed: sorted.length > 1 ? sorted[sorted.length - 1] : null,
+    };
+  });
+}
+
+// Hall of Fame — every winning acca, ranked by combined odds. Includes the
+// juiciest winning leg of that week for a bit of colour.
+export type HallEntry = {
+  week: number;
+  date: string;
+  combinedOdds: number;
+  payout: number;
+  juiciest: { player: Player; sel: string; odds: number } | null;
+};
+
+export function computeHallOfFame(bd: BD): HallEntry[] {
+  return bd.weeks
+    .filter((w) => w.accaWon)
+    .map((w) => {
+      const winners = w.picks
+        .filter((p) => p.result === "Won" && p.odds)
+        .sort((a, b) => (b.odds || 0) - (a.odds || 0));
+      const top = winners[0];
+      const player = top ? bd.players.find((p) => p.id === top.playerId) ?? null : null;
+      return {
+        week: w.week,
+        date: w.date,
+        combinedOdds: w.combinedOdds,
+        payout: Math.round(w.payout || (w.stake || 70) * w.combinedOdds),
+        juiciest:
+          top && player ? { player, sel: top.sel, odds: top.odds || 0 } : null,
+      };
+    })
+    .sort((a, b) => b.combinedOdds - a.combinedOdds);
+}
+
+// Cumulative form — running hit rate over the season, one series per lad,
+// for the multi-line chart. Hit rate only advances on settled (W/L) picks.
+export type CumulativeSeries = {
+  player: Player;
+  points: Array<{ week: number; rate: number; played: number }>;
+};
+
+export function computeCumulative(bd: BD): {
+  weeks: number[];
+  series: CumulativeSeries[];
+} {
+  const ordered = [...bd.weeks].filter((w) => w.filled).sort((a, b) => a.week - b.week);
+  const weeks = ordered.map((w) => w.week);
+  const series = bd.players.map((player) => {
+    let won = 0;
+    let played = 0;
+    const points = ordered.map((w) => {
+      const p = w.picks.find((x) => x.playerId === player.id);
+      if (p && (p.result === "Won" || p.result === "Lost")) {
+        played++;
+        if (p.result === "Won") won++;
+      }
+      return { week: w.week, rate: played > 0 ? won / played : 0, played };
+    });
+    return { player, points };
+  });
+  return { weeks, series };
+}
