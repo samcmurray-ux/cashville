@@ -1,9 +1,10 @@
 "use client";
 
-// Stats — the banter screen. Five sections, top-to-bottom:
+// Stats — the banter screen. Six sections, top-to-bottom:
 //   Pecking Order  · who's hitting and who isn't
 //   Honours Wall   · 6 auto-computed awards w/ slag copy
 //   Damage Report  · per-lad W/L/P stacked bars
+//   Blame Game     · solo kills + € cost per lad (two mini charts)
 //   Heat Strip     · rows = lads, cols = weeks, colored W/L/P cells
 //   Pick Mix       · per-lad sport breakdown donut
 
@@ -11,6 +12,8 @@ import { useMemo } from "react";
 import { useBD } from "@/lib/useBD";
 import { Avatar, Card, Chip, Eyebrow, Headline, Scribble, SPORT_COLORS } from "@/components/primitives";
 import { Donut } from "@/components/donut";
+import { fmtMoney } from "@/lib/bd";
+import type { Player } from "@/lib/types";
 import {
   computeAwards,
   computeHeatStrip,
@@ -22,11 +25,19 @@ import {
 export default function StatsPage() {
   const { bd } = useBD();
 
-  // All five sections derive from the same `stats` array — memo so we don't
+  // All sections derive from the same `stats` array — memo so we don't
   // recompute on every interaction.
-  const { stats, awards, heat, mix, sortedByHit } = useMemo(() => {
+  const { stats, awards, heat, mix, sortedByHit, byKills, byCost } = useMemo(() => {
     if (!bd) {
-      return { stats: [], awards: [], heat: [], mix: [], sortedByHit: [] };
+      return {
+        stats: [],
+        awards: [],
+        heat: [],
+        mix: [],
+        sortedByHit: [],
+        byKills: [],
+        byCost: [],
+      };
     }
     const s = computePlayerStats(bd);
     return {
@@ -35,6 +46,10 @@ export default function StatsPage() {
       heat: computeHeatStrip(bd),
       mix: computePickMix(bd),
       sortedByHit: [...s].sort((a, b) => b.hitRate - a.hitRate),
+      // Blame Game — each chart ranks by its own metric (a kill on a 20.0
+      // week costs more than two kills on 4.0 weeks, so the orders differ).
+      byKills: [...s].sort((a, b) => b.soloKills - a.soloKills || b.soloKillCost - a.soloKillCost),
+      byCost: [...s].sort((a, b) => b.soloKillCost - a.soloKillCost),
     };
   }, [bd]);
 
@@ -42,6 +57,10 @@ export default function StatsPage() {
 
   const topHit = sortedByHit[0]?.hitRate ?? 0;
   const bottomHit = sortedByHit[sortedByHit.length - 1]?.hitRate ?? 0;
+  const maxKills = Math.max(1, ...byKills.map((s) => s.soloKills));
+  const maxCost = Math.max(1, ...byCost.map((s) => s.soloKillCost));
+  const totalKills = byKills.reduce((a, s) => a + s.soloKills, 0);
+  const totalCost = byCost.reduce((a, s) => a + s.soloKillCost, 0);
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -282,6 +301,79 @@ export default function StatsPage() {
         </div>
       </Card>
 
+      {/* ─── Blame Game ──────────────────────────────────────── */}
+      <Card accent="var(--c-burgundy)">
+        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+          <Eyebrow color="var(--c-burgundy)">The Blame Game</Eyebrow>
+          <Headline size={32}>Who torched the slip</Headline>
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            solo kills only — when you alone killed it ↓
+          </Scribble>
+        </div>
+
+        {totalKills === 0 ? (
+          <div className="px-5 py-6 text-center">
+            <Scribble color="var(--c-forest)" size={20} rotate={-1}>
+              nobody's solo-killed it yet — saints, the lot of ye
+            </Scribble>
+          </div>
+        ) : (
+          <>
+            {/* Chart 1 — solo kill counts */}
+            <div className="px-5 pt-4 pb-2">
+              <div
+                className="font-mono uppercase mb-2 flex justify-between"
+                style={{ fontSize: 10, letterSpacing: "0.2em", color: "var(--c-dim)" }}
+              >
+                <span>Solo kills</span>
+                <span>{totalKills} total</span>
+              </div>
+              {byKills.map((s) => (
+                <BlameBar
+                  key={s.player.id}
+                  player={s.player}
+                  value={s.soloKills}
+                  max={maxKills}
+                  display={String(s.soloKills)}
+                  color="var(--c-burgundy)"
+                  dim={s.soloKills === 0}
+                />
+              ))}
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--c-rule)" }} />
+
+            {/* Chart 2 — gross € the group missed because of those kills */}
+            <div className="px-5 pt-4 pb-4">
+              <div
+                className="font-mono uppercase mb-2 flex justify-between"
+                style={{ fontSize: 10, letterSpacing: "0.2em", color: "var(--c-dim)" }}
+              >
+                <span>Damage done (€)</span>
+                <span>{fmtMoney(totalCost)} lost</span>
+              </div>
+              {byCost.map((s) => (
+                <BlameBar
+                  key={s.player.id}
+                  player={s.player}
+                  value={s.soloKillCost}
+                  max={maxCost}
+                  display={fmtMoney(s.soloKillCost)}
+                  color="var(--c-brick)"
+                  dim={s.soloKillCost === 0}
+                />
+              ))}
+              <p
+                className="font-mono mt-2"
+                style={{ fontSize: 9, color: "var(--c-faint)", letterSpacing: "0.1em" }}
+              >
+                € = the gross payout the group would've banked those weeks
+              </p>
+            </div>
+          </>
+        )}
+      </Card>
+
       {/* ─── Heat Strip ──────────────────────────────────────── */}
       <Card accent="var(--c-forest)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
@@ -369,6 +461,50 @@ export default function StatsPage() {
           })}
         </div>
       </Card>
+    </div>
+  );
+}
+
+// One ranked bar in the Blame Game charts. Bar length is value/max; the lad
+// with the most kills (or biggest € cost) fills the whole track. Zero-value
+// lads render dimmed with an empty track so the innocent are visible too.
+function BlameBar({
+  player,
+  value,
+  max,
+  display,
+  color,
+  dim,
+}: {
+  player: Player;
+  value: number;
+  max: number;
+  display: string;
+  color: string;
+  dim?: boolean;
+}) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div className="flex items-center gap-2 py-1" style={{ opacity: dim ? 0.45 : 1 }}>
+      <Avatar player={player} size={22} />
+      <span
+        className="font-mono"
+        style={{ fontSize: 11, width: 42, color: "var(--c-ink)", letterSpacing: "0.02em" }}
+      >
+        {player.name.slice(0, 5)}
+      </span>
+      <div
+        className="flex-1 overflow-hidden"
+        style={{ height: 14, background: "var(--c-rule)", borderRadius: 2 }}
+      >
+        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
+      </div>
+      <span
+        className="font-display text-right"
+        style={{ fontSize: 14, width: 58, color: "var(--c-ink)", lineHeight: 1 }}
+      >
+        {display}
+      </span>
     </div>
   );
 }

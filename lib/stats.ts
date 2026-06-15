@@ -14,6 +14,7 @@ export type PlayerStats = {
   avgWinOdds: number;     // mean of WINNING picks' odds only
   biggestOdds: number;
   soloKills: number; // weeks where this lad was the only loser
+  soloKillCost: number; // gross payout the group missed across his solo kills
   heroPicks: number; // weeks where the acca won and this lad's pick contributed
   longestWin: number;
   longestLose: number;
@@ -40,10 +41,20 @@ export function computePlayerStats(bd: BD): PlayerStats[] {
       ? wonOdds.reduce((a, b) => a + b, 0) / wonOdds.length
       : 0;
 
-    const soloKills = settled.filter((w) => {
+    // Solo kills — weeks where exactly one pick lost and it was his. The
+    // cost is the gross payout the group would have banked that week
+    // (stake × combined odds). combinedOdds already includes his losing
+    // leg's odds, since buildView multiplies every non-push pick — so for a
+    // solo-kill week it's precisely "what we'd have won if his leg landed."
+    const soloKillWeeks = settled.filter((w) => {
       const losers = w.picks.filter((p) => p.result === "Lost");
       return losers.length === 1 && losers[0].playerId === player.id;
-    }).length;
+    });
+    const soloKills = soloKillWeeks.length;
+    const soloKillCost = soloKillWeeks.reduce(
+      (acc, w) => acc + (w.stake || 70) * w.combinedOdds,
+      0,
+    );
 
     const heroPicks = settled.filter(
       (w) =>
@@ -84,6 +95,7 @@ export function computePlayerStats(bd: BD): PlayerStats[] {
       avgWinOdds: +avgWin.toFixed(2),
       biggestOdds: +biggest.toFixed(2),
       soloKills,
+      soloKillCost: Math.round(soloKillCost),
       heroPicks,
       longestWin: lw,
       longestLose: ll,
