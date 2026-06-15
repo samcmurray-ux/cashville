@@ -1,17 +1,22 @@
 "use client";
 
-// History — vertical list of weeks, newest first. Tap any card to see the
-// full slip for that week (all 7 picks) in a read-only bottom sheet.
+// History — vertical list of weeks, newest first ("the book"). Tap any card
+// to open the full slip for that week in an EDITABLE bottom sheet: change
+// any result (W/L/P), edit a pick, add/delete picks. Edits write straight
+// to Supabase and realtime-sync to everyone.
 
 import { useState } from "react";
 import { useBD } from "@/lib/useBD";
 import { Card, Eyebrow, Headline, Chip, Stamp } from "@/components/primitives";
 import { WeekDetailSheet } from "@/components/week-detail-sheet";
-import { fmtMoney } from "@/lib/bd";
+import { AddPickSheet } from "@/components/add-pick-sheet";
+import { fmtMoney, setPickResult } from "@/lib/bd";
 
 export default function HistoryPage() {
-  const { bd } = useBD();
+  const { bd, reload } = useBD();
   const [openWeek, setOpenWeek] = useState<number | null>(null);
+  // When set, the AddPickSheet is open for this player on the open week.
+  const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
 
   if (!bd) return null;
 
@@ -20,6 +25,10 @@ export default function HistoryPage() {
     .sort((a, b) => b.week - a.week);
 
   const selected = openWeek != null ? bd.weeks.find((w) => w.week === openWeek) ?? null : null;
+  const editingPick =
+    selected && editingPlayer
+      ? selected.picks.find((p) => p.playerId === editingPlayer) ?? null
+      : null;
 
   return (
     <div className="px-4 py-4 space-y-3">
@@ -106,7 +115,7 @@ export default function HistoryPage() {
                       color: "var(--c-faint)",
                     }}
                   >
-                    tap to see picks →
+                    tap to view &amp; edit →
                   </span>
                 </div>
               </div>
@@ -120,7 +129,30 @@ export default function HistoryPage() {
         onClose={() => setOpenWeek(null)}
         week={selected}
         players={bd.players}
+        editable
+        onSetResult={async (playerId, result) => {
+          if (openWeek == null) return;
+          // setPickResult also re-rolls the week (acca_won/payout) + logs the
+          // win movement if the 7th result completes a winning acca.
+          await setPickResult(openWeek, playerId, result);
+          await reload();
+        }}
+        onEditPick={(playerId) => setEditingPlayer(playerId)}
       />
+
+      {/* Edit-pick sheet, layered over the detail sheet. weekNum = the open
+          book week, so edits land on that historical week. */}
+      {openWeek != null && editingPlayer && (
+        <AddPickSheet
+          open={true}
+          onClose={() => setEditingPlayer(null)}
+          weekNum={openWeek}
+          playerId={editingPlayer}
+          playerName={bd.players.find((p) => p.id === editingPlayer)?.name}
+          existing={editingPick}
+          onSaved={() => void reload()}
+        />
+      )}
     </div>
   );
 }

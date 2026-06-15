@@ -1,7 +1,9 @@
 "use client";
 
-// Week Detail bottom sheet — opened from the History list. Read-only.
-// Shows all 7 picks for the week with W/L/P stamps, plus payout summary.
+// Week Detail bottom sheet — opened from the History list (editable) and from
+// the Records tab's Near-Misses / Hall of Fame (read-only "relive" view).
+// In editable mode each row becomes a live SlipRow: tap W/L/P to settle,
+// ✎ to edit the pick, + Add to backfill an empty slot.
 
 import { Sheet } from "./sheet";
 import {
@@ -12,6 +14,7 @@ import {
   Headline,
   Stamp,
 } from "./primitives";
+import { SlipRow } from "./slip-row";
 import { fmtMoney } from "@/lib/bd";
 import type { Player, ViewWeek } from "@/lib/types";
 
@@ -20,11 +23,18 @@ export function WeekDetailSheet({
   onClose,
   week,
   players,
+  editable,
+  onSetResult,
+  onEditPick,
 }: {
   open: boolean;
   onClose: () => void;
   week: ViewWeek | null;
   players: Player[];
+  // Editable mode (the History "book" tab). When set, rows become editable.
+  editable?: boolean;
+  onSetResult?: (playerId: string, result: "Won" | "Lost" | "Push" | null) => void;
+  onEditPick?: (playerId: string) => void;
 }) {
   if (!week) return null;
   const dateStr = (() => {
@@ -85,7 +95,17 @@ export function WeekDetailSheet({
         </div>
       </div>
 
-      {/* Picks list — same visual language as the live Slip rows but read-only */}
+      {editable && (
+        <div
+          className="font-mono uppercase mb-2"
+          style={{ fontSize: 9, letterSpacing: "0.16em", color: "var(--c-burgundy)" }}
+        >
+          ✎ editing · W/L/P to settle · ↻ to re-pick a result · ✎ to edit the bet
+        </div>
+      )}
+
+      {/* Picks list — read-only "relive" rows, or editable SlipRows when the
+          History tab opens it in edit mode. */}
       <div
         style={{
           border: "1px solid var(--c-rule-strong)",
@@ -95,6 +115,24 @@ export function WeekDetailSheet({
         {week.picks.map((p, i) => {
           const player = players.find((x) => x.id === p.playerId);
           if (!player) return null;
+
+          // Editable path: reuse the live SlipRow (handles W/L/P toggle, edit
+          // pencil, clear, + Add) with isCurrent=false so it's "past week" mode.
+          if (editable && onSetResult && onEditPick) {
+            return (
+              <SlipRow
+                key={p.playerId}
+                pick={p}
+                player={player}
+                idx={i}
+                isMe={false}
+                isCurrent={false}
+                onAdd={() => onEditPick(p.playerId)}
+                onSetResult={(r) => onSetResult(p.playerId, r)}
+              />
+            );
+          }
+
           const sportColor = SPORT_COLORS[p.sport] || "var(--c-denim)";
           return (
             <div
