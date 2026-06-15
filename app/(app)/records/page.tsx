@@ -1,11 +1,10 @@
 "use client";
 
-// Records — the deep-cuts tab. Eight sections, top-to-bottom:
+// Records — the deep-cuts tab. Seven sections, top-to-bottom:
 //   MVP              · win rate × avg winning odds, ranked
 //   Current Form     · active streak + last-5 strip
 //   Near-Misses      · group heartbreak — one leg away X times
 //   Cost to the Group · every loss, missed payout split among the losers
-//   Contribution     · every win, payout split among winners by odds
 //   Sport Specialist · best & cursed sport per lad
 //   Hall of Fame     · the winning accas, ranked
 //   Season Form      · cumulative hit-rate line chart
@@ -18,7 +17,6 @@ import { WeekDetailSheet } from "@/components/week-detail-sheet";
 import { fmtMoney } from "@/lib/bd";
 import type { Player } from "@/lib/types";
 import {
-  computeContribution,
   computeCumulative,
   computeForm,
   computeGroupCost,
@@ -39,7 +37,6 @@ export default function RecordsPage() {
       form: computeForm(bd),
       near: computeNearMisses(bd),
       groupCost: computeGroupCost(bd),
-      contribution: computeContribution(bd),
       sport: computeSportSpecialist(bd),
       hall: computeHallOfFame(bd),
       cumulative: computeCumulative(bd),
@@ -289,48 +286,6 @@ export default function RecordsPage() {
         </div>
       </Card>
 
-      {/* ─── Contribution to Winnings ────────────────────────── */}
-      <Card accent="var(--c-forest)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-forest)">Contribution to Winnings</Eyebrow>
-          <Headline size={32}>Who brought it home</Headline>
-          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
-            winning weeks only, split by odds ↓
-          </Scribble>
-          <div
-            className="font-mono uppercase mt-2"
-            style={{ fontSize: 10, letterSpacing: "0.16em", color: "var(--c-dim)" }}
-          >
-            {fmtMoney(data.contribution.totalWon)} banked across {data.contribution.weeksWon} winning weeks
-          </div>
-        </div>
-        {data.contribution.weeksWon === 0 ? (
-          <div className="px-5 py-6 text-center">
-            <Scribble color="var(--c-burgundy)" size={20} rotate={-1}>
-              no wins yet — nothing to share out
-            </Scribble>
-          </div>
-        ) : (
-          <div className="px-5 py-4">
-            {data.contribution.rows.map((r) => (
-              <MoneyBar
-                key={r.player.id}
-                player={r.player}
-                value={r.contribution}
-                max={data.contribution.rows[0]?.contribution || 1}
-                color="var(--c-forest)"
-              />
-            ))}
-            <p
-              className="font-mono mt-2"
-              style={{ fontSize: 9, color: "var(--c-faint)", letterSpacing: "0.1em" }}
-            >
-              gross payout, split by each winner's odds ÷ the week's total odds
-            </p>
-          </div>
-        )}
-      </Card>
-
       {/* ─── Sport Specialist ────────────────────────────────── */}
       <Card accent="var(--c-denim)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
@@ -474,9 +429,9 @@ export default function RecordsPage() {
   );
 }
 
-// One ranked € bar — used by both Cost to the Group (burgundy) and
-// Contribution to Winnings (forest). Bar length = value/max (leader fills the
-// track). Zero-value lads dim with an empty track.
+// One ranked € bar (used by Cost to the Group). Takes a color so it can be
+// reused elsewhere. Bar length = value/max (leader fills the track).
+// Zero-value lads dim with an empty track.
 function MoneyBar({
   player,
   value,
