@@ -543,3 +543,46 @@ export function computeCumulative(bd: BD): {
   });
   return { weeks, series };
 }
+
+// Cost to the Group — for EVERY lost week (acca didn't land, ≥1 loser), take
+// the gross payout the group missed (stake × combined odds) and split it
+// EQUALLY among that week's losers. Sum per lad = total damage they're on the
+// hook for. Unlike the Blame Game (sole kills only, full amount), this catches
+// the lads who quietly lose in every group bloodbath.
+export type GroupCostRow = {
+  player: Player;
+  cost: number; // total € share of missed payouts
+  weeksLost: number; // weeks he was among the losers
+};
+
+export function computeGroupCost(bd: BD): {
+  rows: GroupCostRow[];
+  totalCost: number;
+  weeksLost: number;
+} {
+  const tally: Record<string, { cost: number; weeks: number }> = {};
+  let totalCost = 0;
+  let weeksLostCount = 0;
+  for (const w of bd.weeks) {
+    if (!w.filled || w.accaWon) continue;
+    const losers = w.picks.filter((p) => p.result === "Lost");
+    if (losers.length === 0) continue;
+    const missed = (w.stake || 70) * w.combinedOdds; // gross
+    const share = missed / losers.length; // equal split
+    weeksLostCount++;
+    totalCost += missed;
+    for (const l of losers) {
+      const t = (tally[l.playerId] ||= { cost: 0, weeks: 0 });
+      t.cost += share;
+      t.weeks++;
+    }
+  }
+  const rows = bd.players
+    .map((player) => ({
+      player,
+      cost: Math.round(tally[player.id]?.cost || 0),
+      weeksLost: tally[player.id]?.weeks || 0,
+    }))
+    .sort((a, b) => b.cost - a.cost);
+  return { rows, totalCost: Math.round(totalCost), weeksLost: weeksLostCount };
+}

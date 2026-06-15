@@ -1,11 +1,12 @@
 "use client";
 
-// Records — the deep-cuts tab. Five sections, top-to-bottom:
-//   Current Form   · active streak + last-5 strip
-//   Near-Misses    · group heartbreak — one leg away X times
+// Records — the deep-cuts tab. Six sections, top-to-bottom:
+//   Current Form     · active streak + last-5 strip
+//   Near-Misses      · group heartbreak — one leg away X times
+//   Cost to the Group · every loss, missed payout split among the losers
 //   Sport Specialist · best & cursed sport per lad
-//   Hall of Fame   · the winning accas, ranked
-//   Season Form    · cumulative hit-rate line chart
+//   Hall of Fame     · the winning accas, ranked
+//   Season Form      · cumulative hit-rate line chart
 
 import { useMemo, useState } from "react";
 import { useBD } from "@/lib/useBD";
@@ -13,9 +14,11 @@ import { Avatar, Card, Eyebrow, Headline, Scribble, Stamp } from "@/components/p
 import { CumulativeChart } from "@/components/line-chart";
 import { WeekDetailSheet } from "@/components/week-detail-sheet";
 import { fmtMoney } from "@/lib/bd";
+import type { Player } from "@/lib/types";
 import {
   computeCumulative,
   computeForm,
+  computeGroupCost,
   computeHallOfFame,
   computeNearMisses,
   computeSportSpecialist,
@@ -30,6 +33,7 @@ export default function RecordsPage() {
     return {
       form: computeForm(bd),
       near: computeNearMisses(bd),
+      groupCost: computeGroupCost(bd),
       sport: computeSportSpecialist(bd),
       hall: computeHallOfFame(bd),
       cumulative: computeCumulative(bd),
@@ -176,6 +180,39 @@ export default function RecordsPage() {
         </div>
       </Card>
 
+      {/* ─── Cost to the Group ───────────────────────────────── */}
+      <Card accent="var(--c-burgundy)">
+        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+          <Eyebrow color="var(--c-burgundy)">Cost to the Group</Eyebrow>
+          <Headline size={32}>Who's bled us dry</Headline>
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            every loss, split among that week's losers ↓
+          </Scribble>
+          <div
+            className="font-mono uppercase mt-2"
+            style={{ fontSize: 10, letterSpacing: "0.16em", color: "var(--c-dim)" }}
+          >
+            {fmtMoney(data.groupCost.totalCost)} torched across {data.groupCost.weeksLost} lost weeks
+          </div>
+        </div>
+        <div className="px-5 py-4">
+          {data.groupCost.rows.map((r) => (
+            <CostBar
+              key={r.player.id}
+              player={r.player}
+              cost={r.cost}
+              max={data.groupCost.rows[0]?.cost || 1}
+            />
+          ))}
+          <p
+            className="font-mono mt-2"
+            style={{ fontSize: 9, color: "var(--c-faint)", letterSpacing: "0.1em" }}
+          >
+            gross payout missed, split equally between each week's losers
+          </p>
+        </div>
+      </Card>
+
       {/* ─── Sport Specialist ────────────────────────────────── */}
       <Card accent="var(--c-denim)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
@@ -315,6 +352,43 @@ export default function RecordsPage() {
         week={selectedWeek}
         players={bd.players}
       />
+    </div>
+  );
+}
+
+// One ranked bar in Cost to the Group. Bar length = cost/max (worst lad fills
+// the track). Zero-cost lads dim with an empty track.
+function CostBar({
+  player,
+  cost,
+  max,
+}: {
+  player: Player;
+  cost: number;
+  max: number;
+}) {
+  const pct = max > 0 ? (cost / max) * 100 : 0;
+  return (
+    <div className="flex items-center gap-2 py-1" style={{ opacity: cost === 0 ? 0.45 : 1 }}>
+      <Avatar player={player} size={22} />
+      <span
+        className="font-mono"
+        style={{ fontSize: 11, width: 42, color: "var(--c-ink)", letterSpacing: "0.02em" }}
+      >
+        {player.name.slice(0, 5)}
+      </span>
+      <div
+        className="flex-1 overflow-hidden"
+        style={{ height: 14, background: "var(--c-rule)", borderRadius: 2 }}
+      >
+        <div style={{ width: `${pct}%`, height: "100%", background: "var(--c-burgundy)" }} />
+      </div>
+      <span
+        className="font-display text-right"
+        style={{ fontSize: 14, width: 56, color: "var(--c-ink)", lineHeight: 1 }}
+      >
+        {fmtMoney(cost)}
+      </span>
     </div>
   );
 }
