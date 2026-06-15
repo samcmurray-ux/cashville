@@ -1,7 +1,6 @@
 "use client";
 
-// Records — the deep-cuts tab. Six sections, top-to-bottom:
-//   ROI            · "if you'd backed yourself" P&L
+// Records — the deep-cuts tab. Five sections, top-to-bottom:
 //   Current Form   · active streak + last-5 strip
 //   Near-Misses    · group heartbreak — one leg away X times
 //   Sport Specialist · best & cursed sport per lad
@@ -19,7 +18,6 @@ import {
   computeForm,
   computeHallOfFame,
   computeNearMisses,
-  computeROI,
   computeSportSpecialist,
 } from "@/lib/stats";
 
@@ -30,7 +28,6 @@ export default function RecordsPage() {
   const data = useMemo(() => {
     if (!bd) return null;
     return {
-      roi: computeROI(bd),
       form: computeForm(bd),
       near: computeNearMisses(bd),
       sport: computeSportSpecialist(bd),
@@ -46,53 +43,6 @@ export default function RecordsPage() {
 
   return (
     <div className="px-4 py-4 space-y-4">
-      {/* ─── ROI ─────────────────────────────────────────────── */}
-      <Card accent="var(--c-forest)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-forest)">Back Yourself</Eyebrow>
-          <Headline size={32}>If you'd singled it</Headline>
-          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
-            every pick as a €10 single — up or down? ↓
-          </Scribble>
-        </div>
-        <div>
-          {data.roi.map((r, i) => (
-            <div
-              key={r.player.id}
-              className="px-4 py-3 flex items-center gap-3"
-              style={{ borderTop: i === 0 ? "none" : "1px solid var(--c-rule)" }}
-            >
-              <Avatar player={r.player} size={32} />
-              <div className="min-w-0 flex-1">
-                <div
-                  className="font-display"
-                  style={{ fontSize: 16, color: "var(--c-ink)", lineHeight: 1.1 }}
-                >
-                  {r.player.name}
-                </div>
-                <div
-                  className="font-mono uppercase"
-                  style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--c-dim)", marginTop: 1 }}
-                >
-                  {r.bets} bets · €{r.staked} staked · {r.roiPct > 0 ? "+" : ""}
-                  {r.roiPct}% ROI
-                </div>
-              </div>
-              <div
-                className="font-display text-right shrink-0"
-                style={{
-                  fontSize: 22,
-                  color: r.profit > 0 ? "var(--c-forest)" : r.profit < 0 ? "var(--c-burgundy)" : "var(--c-faint)",
-                  lineHeight: 1,
-                }}
-              >
-                {fmtMoney(r.profit, { alwaysSign: true })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
       {/* ─── Current Form ────────────────────────────────────── */}
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
