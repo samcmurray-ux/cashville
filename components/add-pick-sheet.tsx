@@ -53,6 +53,7 @@ export function AddPickSheet({
   playerId,
   playerName,
   existing,
+  stake = 70,
   onSaved,
 }: {
   open: boolean;
@@ -61,6 +62,7 @@ export function AddPickSheet({
   playerId: string;
   playerName?: string;
   existing: ViewPick | null;
+  stake?: number;
   onSaved?: () => void;
 }) {
   const [sport, setSport] = useState<string>(existing?.sport || "Football");
@@ -199,7 +201,7 @@ export function AddPickSheet({
                 letterSpacing: "0.1em",
               }}
             >
-              decimal e.g. <strong>1.40</strong> · fractional e.g. <strong>2/5</strong> · €70 stake
+              decimal e.g. <strong>1.40</strong> · fractional e.g. <strong>2/5</strong> · €{stake} stake
             </p>
             {/* Live conversion preview */}
             {parsed.ok && parsed.mode === "fractional" && (

@@ -2,7 +2,7 @@
 
 // Settle Week — admin marks each of the 7 picks W/L/P, sheet computes the
 // combined odds (Won + Lost only — Push is excluded per bookmaker convention)
-// and the payout (70 × combined). If all 7 land, optionally auto-log the
+// and the payout (stake × combined). If all 7 land, optionally auto-log the
 // win movement so the pot updates instantly.
 
 import { useEffect, useMemo, useState } from "react";
@@ -69,7 +69,7 @@ export function SettleWeekSheet({
     const round = +combined.toFixed(2);
     return {
       combinedOdds: counted > 0 ? round : 0,
-      payout: counted > 0 ? Math.round(70 * round) : 0,
+      payout: counted > 0 ? Math.round(week.stake * round) : 0,
       allPicked: allP,
       allWon: allW && allP,
     };

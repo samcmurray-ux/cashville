@@ -24,6 +24,8 @@ type Raw = {
   trip: TripRow | null;
 };
 
+export const DEFAULT_STAKE = 70;
+
 export async function fetchAll(): Promise<Raw> {
   const client = sb();
   const [players, weeks, picks, movements, trips] = await Promise.all([
@@ -107,7 +109,7 @@ export function buildView(raw: Raw): BD {
       // to 1 on a fresh week-insert (which would otherwise hide the live
       // total until someone settled).
       combinedOdds: +combined.toFixed(2),
-      stake: w.stake_per_acca ?? 70,
+      stake: w.stake_per_acca ?? DEFAULT_STAKE,
       payout: +(w.payout ?? 0),
       accaWon: !!w.acca_won,
       filled,
@@ -156,7 +158,7 @@ export function buildView(raw: Raw): BD {
         notes: "",
       })),
       combinedOdds: 0,
-      stake: 70,
+      stake: DEFAULT_STAKE,
       payout: 0,
       accaWon: false,
       filled: false,
@@ -210,14 +212,9 @@ export function fmtOdds(o: number | null | undefined): string {
 // Reload is the responsibility of the caller / realtime subscription — these
 // just write and rely on the postgres_changes channel to push the new state.
 
-export async function addPick(
-  weekNum: number,
-  playerId: string,
-  payload: { sport: string; sel: string; odds: number; notes?: string },
-  existingDbId?: string,
-) {
+// Ensure the week row exists. (Saturday of the current week.)
+async function ensureWeekRow(weekNum: number) {
   const client = sb();
-  // Ensure the week row exists. (Saturday of the current week.)
   const existing = await client.from("weeks").select("week_number").eq("week_number", weekNum).maybeSingle();
   if (!existing.data) {
     const today = new Date();
@@ -230,6 +227,26 @@ export async function addPick(
       week_date: sat.toISOString().slice(0, 10),
     });
   }
+}
+
+// Change the acca stake for a week (defaults to €70 when never set).
+export async function setWeekStake(weekNum: number, stake: number) {
+  await ensureWeekRow(weekNum);
+  const { error } = await sb()
+    .from("weeks")
+    .update({ stake_per_acca: stake })
+    .eq("week_number", weekNum);
+  if (error) throw error;
+}
+
+export async function addPick(
+  weekNum: number,
+  playerId: string,
+  payload: { sport: string; sel: string; odds: number; notes?: string },
+  existingDbId?: string,
+) {
+  const client = sb();
+  await ensureWeekRow(weekNum);
   const row = {
     week_number: weekNum,
     player_id: playerId,
@@ -301,7 +318,13 @@ export async function setPickResult(
     }
   }
   const combinedOdds = +combined.toFixed(2);
-  const payout = allWon ? Math.round(70 * combinedOdds) : 0;
+  const { data: weekRow } = await client
+    .from("weeks")
+    .select("stake_per_acca")
+    .eq("week_number", weekNum)
+    .maybeSingle();
+  const stake = weekRow?.stake_per_acca ?? DEFAULT_STAKE;
+  const payout = allWon ? Math.round(stake * combinedOdds) : 0;
 
   await client
     .from("weeks")
