@@ -5,8 +5,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Sheet } from "./sheet";
-import { addPick, clearPick } from "@/lib/bd";
-import type { ViewPick } from "@/lib/types";
+import { addPick, clearPick, setLateFine } from "@/lib/bd";
+import type { Fine, ViewPick } from "@/lib/types";
 
 const SPORTS = ["Football", "Rugby", "NFL", "Horses", "GAA", "Golf", "NBA", "MMA", "Darts", "Other"] as const;
 
@@ -53,6 +53,9 @@ export function AddPickSheet({
   playerId,
   playerName,
   existing,
+  stake = 70,
+  lateFine,
+  lateFineAmount,
   onSaved,
 }: {
   open: boolean;
@@ -61,6 +64,11 @@ export function AddPickSheet({
   playerId: string;
   playerName?: string;
   existing: ViewPick | null;
+  stake?: number;
+  // Late-pick fine for this player+week, if one exists. Leave
+  // lateFineAmount undefined to hide the toggle (fines not set up).
+  lateFine?: Fine | null;
+  lateFineAmount?: number;
   onSaved?: () => void;
 }) {
   const [sport, setSport] = useState<string>(existing?.sport || "Football");
@@ -85,6 +93,10 @@ export function AddPickSheet({
 
   // Live odds parse — drives the big decimal preview + validation.
   const parsed = useMemo(() => parseOdds(oddsText), [oddsText]);
+  const [late, setLate] = useState(!!lateFine);
+  useEffect(() => {
+    if (open) setLate(!!lateFine);
+  }, [open, lateFine]);
 
   const submit = async () => {
     setError(null);
@@ -103,6 +115,9 @@ export function AddPickSheet({
         { sport, sel: selection.trim(), odds: parsed.decimal, notes },
         existing?._dbId,
       );
+      if (lateFineAmount != null && late !== !!lateFine && !lateFine?.paid) {
+        await setLateFine(weekNum, playerId, late);
+      }
       onSaved?.();
       onClose();
     } catch (e) {
@@ -199,7 +214,7 @@ export function AddPickSheet({
                 letterSpacing: "0.1em",
               }}
             >
-              decimal e.g. <strong>1.40</strong> · fractional e.g. <strong>2/5</strong> · €70 stake
+              decimal e.g. <strong>1.40</strong> · fractional e.g. <strong>2/5</strong> · €{stake} stake
             </p>
             {/* Live conversion preview */}
             {parsed.ok && parsed.mode === "fractional" && (
@@ -247,6 +262,35 @@ export function AddPickSheet({
             }}
           />
         </div>
+
+        {lateFineAmount != null && (
+          <label
+            className="flex items-center gap-3 p-3"
+            style={{
+              border: `1.5px solid ${late ? "var(--c-burgundy)" : "var(--c-rule)"}`,
+              borderRadius: 2,
+              opacity: lateFine?.paid ? 0.6 : 1,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={late}
+              disabled={!!lateFine?.paid}
+              onChange={(e) => setLate(e.target.checked)}
+              style={{ width: 20, height: 20, accentColor: "var(--c-burgundy)" }}
+            />
+            <span>
+              <span className="font-display block" style={{ fontSize: 16, color: "var(--c-ink)", lineHeight: 1.1 }}>
+                ⏰ Late pick
+              </span>
+              <span className="font-mono uppercase block" style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--c-dim)", marginTop: 2 }}>
+                {lateFine?.paid
+                  ? "fine already paid"
+                  : `adds a €${lateFine?.amount ?? lateFineAmount} fine`}
+              </span>
+            </span>
+          </label>
+        )}
 
         {error && (
           <p

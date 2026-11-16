@@ -4,6 +4,12 @@
 import { sb } from "./supabase";
 import type {
   BD,
+  Fine,
+  FineKind,
+  Settings,
+  SideBet,
+  Vote,
+  VoteKind,
   MovementRow,
   PickRow,
   Player,
@@ -15,6 +21,9 @@ import type {
 } from "./types";
 
 const PLAYER_ORDER = ["sam", "jamie", "james", "jack", "hebo", "conor", "rob"];
+// Who fronts the stake and places the bet, in turn (from the group chat):
+// JT, Conor, Heb, JC, Jamie, Rob, Sam.
+const ROTATION_ORDER = ["james", "conor", "hebo", "jack", "jamie", "rob", "sam"];
 
 type Raw = {
   players: Player[];
@@ -22,16 +31,39 @@ type Raw = {
   picks: PickRow[];
   movements: MovementRow[];
   trip: TripRow | null;
+  // v2 tables — null when supabase/migration-v2.sql hasn't been run yet.
+  settings: Record<string, unknown> | null;
+  fines: Record<string, any>[] | null;
+  votes: Record<string, any>[] | null;
+  sideBets: Record<string, any>[] | null;
 };
+
+export const DEFAULT_SETTINGS: Settings = {
+  lateFine: 10,
+  lossFine: 35,
+  streak4Fine: 50,
+  topup2: 15,
+  topup3: 25,
+  overdueFine: 10,
+  sideBetTaxPct: 20,
+  rulesText: "",
+  finesFromWeek: 0,
+};
+
+export const DEFAULT_STAKE = 70;
 
 export async function fetchAll(): Promise<Raw> {
   const client = sb();
-  const [players, weeks, picks, movements, trips] = await Promise.all([
+  const [players, weeks, picks, movements, trips, settings, fines, votes, sideBets] = await Promise.all([
     client.from("players").select("*").order("name"),
     client.from("weeks").select("*").order("week_number"),
     client.from("picks").select("*"),
     client.from("movements").select("*").order("week_number"),
     client.from("trip_config").select("*").limit(1),
+    client.from("app_settings").select("*").limit(1),
+    client.from("fines").select("*").order("created_at"),
+    client.from("votes").select("*"),
+    client.from("side_bets").select("*").order("created_at"),
   ]);
   return {
     players: (players.data ?? []) as Player[],
@@ -39,6 +71,10 @@ export async function fetchAll(): Promise<Raw> {
     picks: (picks.data ?? []) as PickRow[],
     movements: (movements.data ?? []) as MovementRow[],
     trip: ((trips.data ?? [])[0] ?? null) as TripRow | null,
+    settings: settings.error ? null : ((settings.data ?? [])[0] ?? {}),
+    fines: fines.error ? null : (fines.data ?? []),
+    votes: votes.error ? null : (votes.data ?? []),
+    sideBets: sideBets.error ? null : (sideBets.data ?? []),
   };
 }
 
@@ -107,13 +143,15 @@ export function buildView(raw: Raw): BD {
       // to 1 on a fresh week-insert (which would otherwise hide the live
       // total until someone settled).
       combinedOdds: +combined.toFixed(2),
-      stake: w.stake_per_acca ?? 70,
+      stake: w.stake_per_acca ?? DEFAULT_STAKE,
       payout: +(w.payout ?? 0),
       accaWon: !!w.acca_won,
       filled,
       wonCount,
       lostCount,
       pushCount,
+      placerId: w.placer_id ?? null,
+      placerExplicit: !!w.placer_id,
     };
   });
 
@@ -156,15 +194,37 @@ export function buildView(raw: Raw): BD {
         notes: "",
       })),
       combinedOdds: 0,
-      stake: 70,
+      stake: DEFAULT_STAKE,
       payout: 0,
       accaWon: false,
       filled: false,
       wonCount: 0,
       lostCount: 0,
       pushCount: 0,
+      placerId: null,
+      placerExplicit: false,
     };
     weeks.push(currentWeek);
+  }
+
+  // Whose turn it is to place the bet. The rotation walks the player order
+  // one step per week; setting a week by hand re-anchors it from there.
+  const rota = ROTATION_ORDER.filter((id) => players.some((p) => p.id === id));
+  if (rota.length) {
+    const ordered = [...weeks].sort((a, b) => a.week - b.week);
+    let anchorWeek = ordered[0]?.week ?? 1;
+    let anchorIdx = 0;
+    for (const w of ordered) {
+      const explicitIdx = w.placerExplicit ? rota.indexOf(w.placerId!) : -1;
+      if (explicitIdx >= 0) {
+        anchorWeek = w.week;
+        anchorIdx = explicitIdx;
+      } else {
+        const n = rota.length;
+        w.placerId = rota[(((anchorIdx + w.week - anchorWeek) % n) + n) % n];
+        w.placerExplicit = false;
+      }
+    }
   }
 
   const movements: ViewMovement[] = raw.movements
@@ -193,7 +253,63 @@ export function buildView(raw: Raw): BD {
       breakdown: raw.trip?.breakdown ?? [],
     },
     playedCount: weeks.filter((w) => w.filled).length,
+    settings: {
+      lateFine: num(raw.settings?.late_fine, DEFAULT_SETTINGS.lateFine),
+      lossFine: num(raw.settings?.loss_fine, DEFAULT_SETTINGS.lossFine),
+      streak4Fine: num(raw.settings?.streak4_fine, DEFAULT_SETTINGS.streak4Fine),
+      topup2: num(raw.settings?.topup_2, DEFAULT_SETTINGS.topup2),
+      topup3: num(raw.settings?.topup_3, DEFAULT_SETTINGS.topup3),
+      overdueFine: num(raw.settings?.overdue_fine, DEFAULT_SETTINGS.overdueFine),
+      sideBetTaxPct: num(raw.settings?.side_bet_tax_pct, DEFAULT_SETTINGS.sideBetTaxPct),
+      rulesText: (raw.settings?.rules_text as string) ?? "",
+      finesFromWeek: num(raw.settings?.fines_from_week, 0),
+    },
+    fines: (raw.fines ?? []).map(
+      (f): Fine => ({
+        id: f.id,
+        week: f.week_number,
+        playerId: f.player_id,
+        kind: f.kind,
+        amount: +f.amount,
+        reason: f.reason ?? "",
+        paid: !!f.paid,
+        paidAt: f.paid_at ?? null,
+        movementId: f.movement_id ?? null,
+        parentId: f.parent_fine_id ?? null,
+        createdAt: f.created_at,
+      }),
+    ),
+    votes: (raw.votes ?? []).map(
+      (v): Vote => ({
+        id: v.id,
+        week: v.week_number,
+        voterId: v.voter_id,
+        targetId: v.target_id,
+        kind: v.kind,
+      }),
+    ),
+    sideBets: (raw.sideBets ?? []).map(
+      (b): SideBet => ({
+        id: b.id,
+        week: b.week_number,
+        creatorId: b.creator_id,
+        opponentId: b.opponent_id,
+        subjectId: b.subject_id,
+        creatorBacks: b.creator_backs,
+        amount: +b.amount,
+        status: b.status,
+        paid: !!b.paid,
+        movementId: b.movement_id ?? null,
+        createdAt: b.created_at,
+      }),
+    ),
+    v2Ready: !!raw.settings && !!raw.fines && !!raw.votes && !!raw.sideBets,
   };
+}
+
+function num(v: unknown, fallback: number): number {
+  const n = v == null ? NaN : +(v as number);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 // ─── Formatters ─────────────────────────────────────────────────────────
@@ -210,14 +326,9 @@ export function fmtOdds(o: number | null | undefined): string {
 // Reload is the responsibility of the caller / realtime subscription — these
 // just write and rely on the postgres_changes channel to push the new state.
 
-export async function addPick(
-  weekNum: number,
-  playerId: string,
-  payload: { sport: string; sel: string; odds: number; notes?: string },
-  existingDbId?: string,
-) {
+// Ensure the week row exists. (Saturday of the current week.)
+async function ensureWeekRow(weekNum: number) {
   const client = sb();
-  // Ensure the week row exists. (Saturday of the current week.)
   const existing = await client.from("weeks").select("week_number").eq("week_number", weekNum).maybeSingle();
   if (!existing.data) {
     const today = new Date();
@@ -230,6 +341,26 @@ export async function addPick(
       week_date: sat.toISOString().slice(0, 10),
     });
   }
+}
+
+// Change the acca stake for a week (defaults to €70 when never set).
+export async function setWeekStake(weekNum: number, stake: number) {
+  await ensureWeekRow(weekNum);
+  const { error } = await sb()
+    .from("weeks")
+    .update({ stake_per_acca: stake })
+    .eq("week_number", weekNum);
+  if (error) throw error;
+}
+
+export async function addPick(
+  weekNum: number,
+  playerId: string,
+  payload: { sport: string; sel: string; odds: number; notes?: string },
+  existingDbId?: string,
+) {
+  const client = sb();
+  await ensureWeekRow(weekNum);
   const row = {
     week_number: weekNum,
     player_id: playerId,
@@ -267,6 +398,8 @@ export async function setPickResult(
     .eq("week_number", weekNum)
     .eq("player_id", playerId);
 
+  await syncLossFines(weekNum);
+
   // Re-fetch the week's picks to see if we've just completed it.
   const { data: picks } = await client
     .from("picks")
@@ -301,7 +434,13 @@ export async function setPickResult(
     }
   }
   const combinedOdds = +combined.toFixed(2);
-  const payout = allWon ? Math.round(70 * combinedOdds) : 0;
+  const { data: weekRow } = await client
+    .from("weeks")
+    .select("stake_per_acca")
+    .eq("week_number", weekNum)
+    .maybeSingle();
+  const stake = weekRow?.stake_per_acca ?? DEFAULT_STAKE;
+  const payout = allWon ? Math.round(stake * combinedOdds) : 0;
 
   await client
     .from("weeks")
@@ -337,13 +476,40 @@ export async function addMovement(payload: {
   type: MovementRow["type"];
   amount: number;
   notes?: string;
-}) {
-  await sb().from("movements").insert({
-    week_number: payload.week,
-    type: payload.type,
-    amount: payload.amount,
-    notes: payload.notes ?? "",
-  });
+}): Promise<string> {
+  const { data, error } = await sb()
+    .from("movements")
+    .insert({
+      week_number: payload.week,
+      type: payload.type,
+      amount: payload.amount,
+      notes: payload.notes ?? "",
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function updateMovement(
+  id: string,
+  payload: {
+    week: number | null;
+    type: MovementRow["type"];
+    amount: number;
+    notes?: string;
+  },
+) {
+  const { error } = await sb()
+    .from("movements")
+    .update({
+      week_number: payload.week,
+      type: payload.type,
+      amount: payload.amount,
+      notes: payload.notes ?? "",
+    })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function removeMovement(id: string) {
@@ -375,6 +541,8 @@ export async function settleWeek(args: {
     ),
   );
 
+  await syncLossFines(args.weekNum);
+
   const accaWon = args.results.every((r) => r.result === "Won");
 
   await client
@@ -395,4 +563,334 @@ export async function settleWeek(args: {
       notes: `Acca landed @${args.combinedOdds.toFixed(2)}`,
     });
   }
+}
+
+// ─── Week details ───────────────────────────────────────────────────────
+export async function setWeekDate(weekNum: number, date: string) {
+  await ensureWeekRow(weekNum);
+  const { error } = await sb().from("weeks").update({ week_date: date }).eq("week_number", weekNum);
+  if (error) throw error;
+}
+
+// `playerId` null = go back to following the rotation.
+export async function setWeekPlacer(weekNum: number, playerId: string | null) {
+  await ensureWeekRow(weekNum);
+  const { error } = await sb().from("weeks").update({ placer_id: playerId }).eq("week_number", weekNum);
+  if (error) throw error;
+}
+
+export async function saveSettings(patch: Partial<Settings>) {
+  const row: Record<string, unknown> = { id: 1 };
+  if (patch.lateFine != null) row.late_fine = patch.lateFine;
+  if (patch.lossFine != null) row.loss_fine = patch.lossFine;
+  if (patch.streak4Fine != null) row.streak4_fine = patch.streak4Fine;
+  if (patch.topup2 != null) row.topup_2 = patch.topup2;
+  if (patch.topup3 != null) row.topup_3 = patch.topup3;
+  if (patch.overdueFine != null) row.overdue_fine = patch.overdueFine;
+  if (patch.sideBetTaxPct != null) row.side_bet_tax_pct = patch.sideBetTaxPct;
+  if (patch.rulesText != null) row.rules_text = patch.rulesText;
+  const { error } = await sb().from("app_settings").upsert(row);
+  if (error) throw error;
+}
+
+// ─── Fines ──────────────────────────────────────────────────────────────
+export const FINE_LABEL: Record<FineKind, string> = {
+  late: "Late pick",
+  loss: "Losing leg",
+  overdue: "Unpaid fine",
+  manual: "Fine",
+};
+
+export async function addFine(f: {
+  week: number | null;
+  playerId: string;
+  kind: FineKind;
+  amount: number;
+  reason?: string;
+  parentId?: string;
+}) {
+  const { error } = await sb().from("fines").insert({
+    week_number: f.week,
+    player_id: f.playerId,
+    kind: f.kind,
+    amount: f.amount,
+    reason: f.reason ?? "",
+    parent_fine_id: f.parentId ?? null,
+  });
+  if (error) throw error;
+}
+
+// Editing a paid fine's amount keeps its Pot entry in step.
+export async function updateFine(fine: Fine, patch: { amount: number; reason: string }) {
+  const { error } = await sb()
+    .from("fines")
+    .update({ amount: patch.amount, reason: patch.reason })
+    .eq("id", fine.id);
+  if (error) throw error;
+  if (fine.paid && fine.movementId) {
+    await sb().from("movements").update({ amount: patch.amount }).eq("id", fine.movementId);
+  }
+}
+
+export async function deleteFine(fine: Fine) {
+  if (fine.movementId) await removeMovement(fine.movementId);
+  const { error } = await sb().from("fines").delete().eq("id", fine.id);
+  if (error) throw error;
+}
+
+// Paying a fine drops it into the Pot; un-paying takes it back out.
+export async function setFinePaid(fine: Fine, paid: boolean, playerName: string) {
+  let movementId: string | null = null;
+  if (paid) {
+    movementId = await addMovement({
+      week: fine.week,
+      type: "forfeit",
+      amount: fine.amount,
+      notes: `${playerName} · ${FINE_LABEL[fine.kind].toLowerCase()}${fine.reason ? ` · ${fine.reason}` : ""}`,
+    });
+  } else if (fine.movementId) {
+    await removeMovement(fine.movementId);
+  }
+  const { error } = await sb()
+    .from("fines")
+    .update({
+      paid,
+      paid_at: paid ? new Date().toISOString() : null,
+      movement_id: movementId,
+    })
+    .eq("id", fine.id);
+  if (error) throw error;
+}
+
+// Tick/untick "late" on a player's pick. Unticking only removes an unpaid fine.
+export async function setLateFine(weekNum: number, playerId: string, late: boolean) {
+  const client = sb();
+  if (late) {
+    const { data: st } = await client.from("app_settings").select("late_fine").limit(1);
+    const { error } = await client.from("fines").insert({
+      week_number: weekNum,
+      player_id: playerId,
+      kind: "late",
+      amount: num(st?.[0]?.late_fine, DEFAULT_SETTINGS.lateFine),
+    });
+    // 23505 = it already exists, which is what we wanted anyway.
+    if (error && error.code !== "23505") throw error;
+  } else {
+    await client
+      .from("fines")
+      .delete()
+      .eq("week_number", weekNum)
+      .eq("player_id", playerId)
+      .eq("kind", "late")
+      .eq("paid", false);
+  }
+}
+
+// Losing streaks. Walking back from the newest week: a Lost pick adds one, a
+// Won pick ends it, a push or a missed week is skipped.
+function streakOf(results: string[]): number {
+  let n = 0;
+  for (const r of results) {
+    if (r === "Lost") n++;
+    else if (r === "Won") break;
+  }
+  return n;
+}
+
+// Each player's losing streak going INTO `weekNum` (weeks before it only).
+export function lossStreaks(weeks: ViewWeek[], weekNum: number): Record<string, number> {
+  const prior = weeks.filter((w) => w.week < weekNum).sort((a, b) => b.week - a.week);
+  const results: Record<string, string[]> = {};
+  for (const w of prior) {
+    for (const p of w.picks) (results[p.playerId] ||= []).push(p.result);
+  }
+  const out: Record<string, number> = {};
+  for (const id of Object.keys(results)) out[id] = streakOf(results[id]);
+  return out;
+}
+
+// What a streak costs on top of the kitty fine: extra on next week's bet
+// after 2 or 3 in a row, and a ban at 4.
+export function streakPenalty(streak: number, s: Settings): { topup: number; banned: boolean } {
+  if (streak >= 4) return { topup: 0, banned: true };
+  if (streak === 3) return { topup: s.topup3, banned: false };
+  if (streak === 2) return { topup: s.topup2, banned: false };
+  return { topup: 0, banned: false };
+}
+
+// Keep losing-leg fines matching the week's results: a Lost pick gets one
+// (the bigger one on a 4th loss in a row), and an unpaid one disappears if
+// the result is corrected. Quietly does nothing until the v2 tables exist.
+async function syncLossFines(weekNum: number) {
+  const client = sb();
+  const [{ data: st }, { data: picks }, { data: existing, error }] = await Promise.all([
+    client.from("app_settings").select("loss_fine, streak4_fine, fines_from_week").limit(1),
+    client.from("picks").select("player_id, result, week_number").lte("week_number", weekNum),
+    client.from("fines").select("id, player_id, paid").eq("week_number", weekNum).eq("kind", "loss"),
+  ]);
+  if (error || !picks) return;
+  if (weekNum < num(st?.[0]?.fines_from_week, 0)) return;
+  const lost = new Set(
+    picks.filter((p) => p.week_number === weekNum && p.result === "Lost").map((p) => p.player_id),
+  );
+  const have = new Set((existing ?? []).map((f) => f.player_id));
+  const toAdd = [...lost].filter((id) => !have.has(id));
+  const toDrop = (existing ?? []).filter((f) => !lost.has(f.player_id) && !f.paid);
+  if (toAdd.length) {
+    await client.from("fines").insert(
+      toAdd.map((id) => {
+        const streak = streakOf(
+          picks
+            .filter((p) => p.player_id === id)
+            .sort((a, b) => b.week_number - a.week_number)
+            .map((p) => p.result ?? ""),
+        );
+        return {
+          week_number: weekNum,
+          player_id: id,
+          kind: "loss",
+          amount:
+            streak >= 4
+              ? num(st?.[0]?.streak4_fine, DEFAULT_SETTINGS.streak4Fine)
+              : num(st?.[0]?.loss_fine, DEFAULT_SETTINGS.lossFine),
+          reason: streak >= 2 ? `${streak} in a row` : "",
+        };
+      }),
+    );
+  }
+  if (toDrop.length) {
+    await client.from("fines").delete().in("id", toDrop.map((f) => f.id));
+  }
+}
+
+// When a fine has to be paid by: the start of the weekend after its week.
+export function fineDeadline(fine: Fine, weeks: ViewWeek[]): Date {
+  const wk = fine.week != null ? weeks.find((w) => w.week === fine.week) : null;
+  const base = new Date(wk?.date ?? fine.createdAt);
+  base.setDate(base.getDate() + 7);
+  return base;
+}
+
+// Add the "unpaid fine" surcharge to anything that sailed past its deadline.
+// Runs when the app loads; the unique index stops two phones doubling up.
+export async function sweepOverdueFines(bd: BD) {
+  if (!bd.v2Ready) return;
+  const now = new Date();
+  const surcharged = new Set(bd.fines.map((f) => f.parentId).filter(Boolean));
+  const due = bd.fines.filter((f) => {
+    if (f.kind === "overdue" || surcharged.has(f.id)) return false;
+    const deadline = fineDeadline(f, bd.weeks);
+    return f.paid ? !!f.paidAt && new Date(f.paidAt) > deadline : now > deadline;
+  });
+  if (!due.length) return;
+  await sb()
+    .from("fines")
+    .upsert(
+      due.map((f) => ({
+        week_number: f.week,
+        player_id: f.playerId,
+        kind: "overdue",
+        amount: bd.settings.overdueFine,
+        reason: `${FINE_LABEL[f.kind].toLowerCase()} not paid in time`,
+        parent_fine_id: f.id,
+      })),
+      { onConflict: "parent_fine_id", ignoreDuplicates: true },
+    );
+}
+
+// ─── Votes ──────────────────────────────────────────────────────────────
+// ⭐ and 💩: one of each per voter per week. Vibes: win OR lose per pick.
+// Tapping the vote you already cast removes it.
+export async function castVote(
+  weekNum: number,
+  voterId: string,
+  targetId: string,
+  kind: VoteKind,
+  existing: Vote[],
+) {
+  const client = sb();
+  const mine = existing.filter((v) => v.week === weekNum && v.voterId === voterId);
+  const same = mine.find((v) => v.targetId === targetId && v.kind === kind);
+  const clash =
+    kind === "star" || kind === "poo"
+      ? mine.filter((v) => v.kind === kind)
+      : mine.filter((v) => v.targetId === targetId && (v.kind === "win" || v.kind === "lose"));
+  if (clash.length) {
+    const { error } = await client.from("votes").delete().in("id", clash.map((v) => v.id));
+    if (error) throw error;
+  }
+  if (same) return;
+  const { error } = await client.from("votes").insert({
+    week_number: weekNum,
+    voter_id: voterId,
+    target_id: targetId,
+    kind,
+  });
+  if (error) throw error;
+}
+
+// ─── Side bets ──────────────────────────────────────────────────────────
+export async function addSideBet(b: {
+  week: number;
+  creatorId: string;
+  opponentId: string;
+  subjectId: string;
+  creatorBacks: "win" | "lose";
+  amount: number;
+}) {
+  const { error } = await sb().from("side_bets").insert({
+    week_number: b.week,
+    creator_id: b.creatorId,
+    opponent_id: b.opponentId,
+    subject_id: b.subjectId,
+    creator_backs: b.creatorBacks,
+    amount: b.amount,
+  });
+  if (error) throw error;
+}
+
+export async function respondSideBet(id: string, status: "accepted" | "declined") {
+  const { error } = await sb().from("side_bets").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteSideBet(bet: SideBet) {
+  if (bet.movementId) await removeMovement(bet.movementId);
+  const { error } = await sb().from("side_bets").delete().eq("id", bet.id);
+  if (error) throw error;
+}
+
+// Where a side bet stands, worked out from the subject's pick result.
+export type SideBetOutcome =
+  | { state: "open" | "declined" | "live" | "void" }
+  | { state: "won"; winnerId: string; loserId: string; tax: number; toWinner: number };
+
+export function sideBetOutcome(bet: SideBet, weeks: ViewWeek[], taxPct: number): SideBetOutcome {
+  if (bet.status === "declined") return { state: "declined" };
+  const pick = weeks.find((w) => w.week === bet.week)?.picks.find((p) => p.playerId === bet.subjectId);
+  const result = pick?.result ?? "";
+  if (bet.status === "open") return { state: result ? "void" : "open" };
+  if (result === "Push") return { state: "void" };
+  if (result !== "Won" && result !== "Lost") return { state: "live" };
+  const creatorWon = (result === "Won") === (bet.creatorBacks === "win");
+  const tax = Math.round(bet.amount * taxPct) / 100;
+  return {
+    state: "won",
+    winnerId: creatorWon ? bet.creatorId : bet.opponentId,
+    loserId: creatorWon ? bet.opponentId : bet.creatorId,
+    tax,
+    toWinner: bet.amount - tax,
+  };
+}
+
+// Squaring up: the loser has paid, so the Pot's cut goes into the ledger.
+export async function setSideBetPaid(bet: SideBet, paid: boolean, tax: number, note: string) {
+  let movementId: string | null = null;
+  if (paid && tax > 0) {
+    movementId = await addMovement({ week: bet.week, type: "bonus", amount: tax, notes: note });
+  } else if (!paid && bet.movementId) {
+    await removeMovement(bet.movementId);
+  }
+  const { error } = await sb().from("side_bets").update({ paid, movement_id: movementId }).eq("id", bet.id);
+  if (error) throw error;
 }

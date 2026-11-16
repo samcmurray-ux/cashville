@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/slip", label: "Slip", icon: SlipIcon },
   { href: "/pot", label: "Pot", icon: PotIcon },
+  { href: "/fines", label: "Fines", icon: FinesIcon },
   { href: "/stats", label: "Stats", icon: StatsIcon },
   { href: "/records", label: "Records", icon: RecordsIcon },
   { href: "/history", label: "History", icon: HistoryIcon },
@@ -20,7 +21,7 @@ export function BottomNav() {
       className="fixed left-0 right-0 bottom-0 z-40 border-t border-rule-strong bg-paper pb-safe"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 6px)" }}
     >
-      <div className="grid grid-cols-5 max-w-md mx-auto">
+      <div className="grid grid-cols-6 max-w-md mx-auto">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = path === href || path.startsWith(href + "/");
           return (
@@ -37,8 +38,8 @@ export function BottomNav() {
               <span
                 className="font-stamp uppercase"
                 style={{
-                  fontSize: 10.5,
-                  letterSpacing: "0.1em",
+                  fontSize: 10,
+                  letterSpacing: "0.06em",
                   marginTop: 2,
                 }}
               >
@@ -68,6 +69,16 @@ function PotIcon({ active }: { active: boolean }) {
       <path d="M5 9h14l-1 11H6L5 9z" strokeLinejoin="round" />
       <path d="M8 9V6a4 4 0 014-4 4 4 0 014 4v3" strokeLinecap="round" />
       <path d="M12 13v3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function FinesIcon({ active }: { active: boolean }) {
+  // Referee's whistle-ish card — the sin bin.
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
+      <rect x="6" y="3" width="12" height="18" rx="1.5" strokeLinejoin="round" />
+      <path d="M12 8v5M12 16.5v.5" strokeLinecap="round" />
     </svg>
   );
 }

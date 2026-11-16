@@ -150,6 +150,7 @@ export default function HistoryPage() {
           playerId={editingPlayer}
           playerName={bd.players.find((p) => p.id === editingPlayer)?.name}
           existing={editingPick}
+          stake={bd.weeks.find((w) => w.week === openWeek)?.stake}
           onSaved={() => void reload()}
         />
       )}

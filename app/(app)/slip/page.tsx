@@ -12,7 +12,11 @@ import { Card, Eyebrow, Headline, Scribble, Stamp } from "@/components/primitive
 import { SlipRow } from "@/components/slip-row";
 import { AddPickSheet } from "@/components/add-pick-sheet";
 import { SettleWeekSheet } from "@/components/settle-week-sheet";
-import { fmtMoney, setPickResult } from "@/lib/bd";
+import { fmtMoney, lossStreaks, setPickResult, streakPenalty } from "@/lib/bd";
+import { EditStakeSheet } from "@/components/edit-stake-sheet";
+import { WeekInfoSheet } from "@/components/week-info-sheet";
+import { VoteStrip, VotesSheet } from "@/components/votes";
+import { SideBetsCard } from "@/components/side-bets";
 
 export default function SlipPage() {
   const { bd, reload } = useBD();
@@ -25,6 +29,9 @@ export default function SlipPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
+  const [editingStake, setEditingStake] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [votingPlayer, setVotingPlayer] = useState<string | null>(null);
 
   // Memos before any early return so hook order is stable.
   const allWeeks = useMemo(() => {
@@ -51,6 +58,21 @@ export default function SlipPage() {
   const idx = allWeeks.indexOf(week.week);
   const prevW = idx > 0 ? allWeeks[idx - 1] : null;
   const nextW = idx >= 0 && idx < allWeeks.length - 1 ? allWeeks[idx + 1] : null;
+
+  // Losing-streak consequences for this week's bet: top-ups and bans.
+  const streaks = lossStreaks(bd.weeks, week.week);
+  const streakNotes = bd.v2Ready
+    ? bd.players
+        .map((p) => ({ name: p.name, streak: streaks[p.id] ?? 0, ...streakPenalty(streaks[p.id] ?? 0, bd.settings) }))
+        .filter((x) => x.topup > 0 || x.banned)
+    : [];
+  const topups = streakNotes.filter((x) => x.topup > 0).map((x) => ({ name: x.name, amount: x.topup }));
+
+  const placer = bd.players.find((p) => p.id === week.placerId) ?? null;
+  const weekVotes = bd.votes.filter((v) => v.week === week.week);
+  const votingPick = votingPlayer
+    ? week.picks.find((p) => p.playerId === votingPlayer) ?? null
+    : null;
 
   const editingPick = editingPlayer
     ? week.picks.find((p) => p.playerId === editingPlayer) ?? null
@@ -90,6 +112,29 @@ export default function SlipPage() {
             Week {week.week}
             {isCurrent ? " · current" : week.accaWon ? " · winner" : " · settled"}
           </Eyebrow>
+
+          {/* Weekend date + whose turn it is to place the bet. Tap to edit. */}
+          <button
+            onClick={() => setEditingInfo(true)}
+            className="font-mono uppercase text-left mt-1.5 flex items-center gap-1.5 flex-wrap"
+            style={{ fontSize: 10.5, letterSpacing: "0.12em", color: "var(--c-ink-soft)" }}
+          >
+            <span>📅 {fmtWeekend(week.date)}</span>
+            {bd.v2Ready && placer && (
+              <span
+                style={{
+                  padding: "2px 6px",
+                  borderRadius: 2,
+                  background: placer.id === meId ? "var(--c-mustard)" : "var(--c-bg2)",
+                  color: "var(--c-ink)",
+                  fontWeight: 600,
+                }}
+              >
+                🎟 {placer.id === meId ? "your turn to place it" : `${placer.name} places it`}
+              </span>
+            )}
+            <span style={{ color: "var(--c-faint)" }}>✎</span>
+          </button>
 
           <div className="flex items-start justify-between gap-3 mt-2">
             <div className="min-w-0 flex-1">
@@ -142,7 +187,7 @@ export default function SlipPage() {
               >
                 {isCurrent
                   ? `${entered} of 7 in`
-                  : `paid €${Math.round(week.payout || 70 * week.combinedOdds).toLocaleString()}`}
+                  : `paid €${Math.round(week.payout || week.stake * week.combinedOdds).toLocaleString()}`}
               </div>
             </div>
           </div>
@@ -247,8 +292,8 @@ export default function SlipPage() {
           {week.picks.map((p, i) => {
             const player = bd.players.find((x) => x.id === p.playerId)!;
             return (
+              <div key={p.playerId}>
               <SlipRow
-                key={p.playerId}
                 pick={p}
                 player={player}
                 idx={i}
@@ -263,6 +308,17 @@ export default function SlipPage() {
                   await reload();
                 }}
               />
+              {/* Votes: ⭐ 💩 👍 👎 — tap to see who voted and cast yours. */}
+              {bd.v2Ready && p.filled && (
+                <div className="px-4 pb-2.5" style={{ marginTop: -4, paddingLeft: 82 }}>
+                  <VoteStrip
+                    votes={weekVotes.filter((v) => v.targetId === p.playerId)}
+                    meId={meId}
+                    onOpen={() => setVotingPlayer(p.playerId)}
+                  />
+                </div>
+              )}
+              </div>
             );
           })}
         </div>
@@ -272,10 +328,21 @@ export default function SlipPage() {
           className="grid grid-cols-3 border-t"
           style={{ borderColor: "var(--c-rule)", background: "var(--c-bg2)" }}
         >
-          <Stat label="Stake" value="€70" sub="€10 a head" />
+          <Stat
+            label="Stake"
+            value={fmtMoney(week.stake)}
+            sub={
+              week.accaWon
+                ? `€${+(week.stake / 7).toFixed(2)} a head`
+                : `€${+(week.stake / 7).toFixed(2)} a head · ✎ edit`
+            }
+            // Stake is locked once an acca has landed — the win is already
+            // logged in the pot at the old stake.
+            onClick={week.accaWon ? undefined : () => setEditingStake(true)}
+          />
           <Stat
             label={isCurrent ? "If all 7 land" : week.accaWon ? "Banked" : "Would've paid"}
-            value={fmtMoney(week.payout || 70 * week.combinedOdds)}
+            value={fmtMoney(week.payout || week.stake * week.combinedOdds)}
             valueColor={
               week.accaWon
                 ? "var(--c-forest)"
@@ -299,13 +366,27 @@ export default function SlipPage() {
             value={fmtMoney(
               // Gross return adds to the pot — the players consider the full
               // bookies' payout (stake + winnings) as the pot's intake.
-              bd.trip.current + (isCurrent ? 70 * week.combinedOdds : 0),
+              bd.trip.current + (isCurrent ? week.stake * week.combinedOdds : 0),
             )}
             valueColor="var(--c-mustard)"
             sub="vs €10k"
             divider
           />
         </div>
+
+        {streakNotes.length > 0 && !week.accaWon && (
+          <div
+            className="px-4 py-2 font-mono border-t"
+            style={{ borderColor: "var(--c-rule)", fontSize: 10.5, letterSpacing: "0.06em", color: "var(--c-burgundy)", lineHeight: 1.6 }}
+          >
+            {streakNotes.map((x) => (
+              <div key={x.name}>
+                🔥 {x.name} · {x.streak} losses in a row ·{" "}
+                {x.banned ? "1-month ban" : `adds €${x.topup} to this bet`}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Settle button — anyone can settle. Available on any week once all
             7 picks are filled. Re-settling is fine; results overwrite. */}
@@ -333,6 +414,8 @@ export default function SlipPage() {
         )}
       </Card>
 
+      <SideBetsCard bd={bd} week={week} meId={meId} onChanged={() => void reload()} />
+
       {/* Add Pick sheet — opens for whichever row's tapped (anyone, any week).
           The sheet title shows the player's name + week so you don't get
           confused about whose pick you're editing. */}
@@ -346,6 +429,49 @@ export default function SlipPage() {
             bd.players.find((p) => p.id === editingPlayer)?.name ?? editingPlayer
           }
           existing={editingPick}
+          stake={week.stake}
+          lateFine={
+            bd.fines.find(
+              (f) => f.kind === "late" && f.week === week.week && f.playerId === editingPlayer,
+            ) ?? null
+          }
+          lateFineAmount={bd.v2Ready ? bd.settings.lateFine : undefined}
+          onSaved={() => void reload()}
+        />
+      )}
+
+      {editingInfo && (
+        <WeekInfoSheet
+          open={true}
+          onClose={() => setEditingInfo(false)}
+          week={week}
+          players={bd.players}
+          onSaved={() => void reload()}
+        />
+      )}
+
+      {votingPlayer && votingPick && (
+        <VotesSheet
+          open={true}
+          onClose={() => setVotingPlayer(null)}
+          weekNum={week.week}
+          pick={votingPick}
+          player={bd.players.find((p) => p.id === votingPlayer)!}
+          players={bd.players}
+          votes={bd.votes}
+          meId={meId}
+          onSaved={() => void reload()}
+        />
+      )}
+
+      {/* Edit Stake sheet — anyone can change the week's acca stake */}
+      {editingStake && (
+        <EditStakeSheet
+          open={true}
+          onClose={() => setEditingStake(false)}
+          weekNum={week.week}
+          stake={week.stake}
+          topups={topups}
           onSaved={() => void reload()}
         />
       )}
@@ -362,6 +488,12 @@ export default function SlipPage() {
       )}
     </div>
   );
+}
+
+function fmtWeekend(iso: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" });
 }
 
 function WeekBtn({
@@ -400,17 +532,24 @@ function Stat({
   sub,
   valueColor,
   divider,
+  onClick,
 }: {
   label: string;
   value: string;
   sub: string;
   valueColor?: string;
   divider?: boolean;
+  onClick?: () => void;
 }) {
+  const Tag = onClick ? "button" : "div";
   return (
-    <div
-      className="px-3 py-3"
-      style={{ borderLeft: divider ? "1px dashed var(--c-rule)" : "none" }}
+    <Tag
+      onClick={onClick}
+      className="px-3 py-3 text-left"
+      style={{
+        borderLeft: divider ? "1px dashed var(--c-rule)" : "none",
+        background: "transparent",
+      }}
     >
       <div
         className="font-mono uppercase"
@@ -444,6 +583,6 @@ function Stat({
       >
         {sub}
       </div>
-    </div>
+    </Tag>
   );
 }

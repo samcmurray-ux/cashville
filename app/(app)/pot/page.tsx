@@ -7,7 +7,8 @@ import { useState } from "react";
 import { useBD } from "@/lib/useBD";
 import { Card, Eyebrow, Headline, Postmark, Scribble, Chip } from "@/components/primitives";
 import { LogMovementSheet } from "@/components/log-movement-sheet";
-import { fmtMoney, removeMovement } from "@/lib/bd";
+import { fmtMoney } from "@/lib/bd";
+import type { ViewMovement } from "@/lib/types";
 
 const TYPE_COLOR: Record<string, string> = {
   win: "var(--c-forest)",
@@ -26,6 +27,7 @@ const TYPE_LABEL: Record<string, string> = {
 export default function PotPage() {
   const { bd, reload } = useBD();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<ViewMovement | null>(null);
 
   if (!bd) return null;
 
@@ -170,9 +172,14 @@ export default function PotPage() {
             {[...bd.movements]
               .sort((a, b) => (b.week ?? 0) - (a.week ?? 0))
               .map((m, i) => (
-                <div
+                <button
                   key={m.id}
-                  className="px-4 py-3 flex items-center gap-3"
+                  onClick={() => {
+                    setEditing(m);
+                    setSheetOpen(true);
+                  }}
+                  aria-label="Edit entry"
+                  className="w-full text-left px-4 py-3 flex items-center gap-3"
                   style={{
                     borderTop: i === 0 ? "none" : "1px solid var(--c-rule)",
                   }}
@@ -213,25 +220,14 @@ export default function PotPage() {
                   >
                     {fmtMoney(m.amount, { alwaysSign: true })}
                   </div>
-                  <button
-                    onClick={async () => {
-                      if (confirm("Delete this movement?")) {
-                        await removeMovement(m.id);
-                        await reload();
-                      }
-                    }}
-                    aria-label="Delete movement"
+                  <span
+                    aria-hidden
                     className="font-mono shrink-0"
-                    style={{
-                      fontSize: 10,
-                      color: "var(--c-faint)",
-                      letterSpacing: "0.1em",
-                      padding: "4px 6px",
-                    }}
+                    style={{ fontSize: 12, color: "var(--c-faint)" }}
                   >
-                    ✕
-                  </button>
-                </div>
+                    ✎
+                  </span>
+                </button>
               ))}
           </div>
         )}
@@ -239,7 +235,10 @@ export default function PotPage() {
 
       {/* Floating + Log button */}
       <button
-        onClick={() => setSheetOpen(true)}
+        onClick={() => {
+          setEditing(null);
+          setSheetOpen(true);
+        }}
         className="fixed font-stamp uppercase shadow-card"
         style={{
           bottom: "calc(env(safe-area-inset-bottom) + 70px)",
@@ -261,6 +260,7 @@ export default function PotPage() {
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         defaultWeek={bd.currentWeekNum}
+        existing={editing}
         onSaved={() => void reload()}
       />
     </div>
