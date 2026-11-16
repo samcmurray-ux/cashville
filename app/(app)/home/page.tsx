@@ -10,6 +10,7 @@ import { useBD } from "@/lib/useBD";
 import { useMe } from "@/lib/useMe";
 import { Avatar, Card, Eyebrow, Headline, Scribble } from "@/components/primitives";
 import { LastWeekend } from "@/components/last-weekend";
+import { PushCard } from "@/components/push-card";
 import { fmtMoney, sideBetOutcome } from "@/lib/bd";
 
 // Picks are due at 6pm on the Friday before the weekend (week.date is the
@@ -216,6 +217,8 @@ export default function HomePage() {
           </Card>
         </Link>
       )}
+
+      <PushCard />
 
       <LastWeekend bd={bd} />
     </div>

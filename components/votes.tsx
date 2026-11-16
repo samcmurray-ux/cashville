@@ -10,6 +10,7 @@ import { castVote } from "@/lib/bd";
 import type { Player, ViewPick, Vote, VoteKind } from "@/lib/types";
 import { Avatar } from "./primitives";
 import { ErrorLine } from "./ui";
+import { notify } from "@/lib/push";
 
 const KINDS: { kind: VoteKind; icon: string; label: string; sub: string }[] = [
   { kind: "star", icon: "⭐", label: "Bet of the week", sub: "one per week" },
@@ -95,7 +96,11 @@ export function VotesSheet({
     setBusy(true);
     setError(null);
     try {
+      const undo = votes.some(
+        (v) => v.week === weekNum && v.voterId === meId && v.targetId === player.id && v.kind === kind,
+      );
       await castVote(weekNum, meId, player.id, kind, votes);
+      if (!undo) notify({ kind: "vote", week: weekNum, voterId: meId, targetId: player.id, voteKind: kind });
       onSaved?.();
     } catch (e) {
       setError((e as Error).message || "Vote failed");

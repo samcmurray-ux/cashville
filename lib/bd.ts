@@ -877,16 +877,21 @@ export async function addSideBet(b: {
   subjectId: string;
   creatorBacks: "win" | "lose";
   amount: number;
-}) {
-  const { error } = await sb().from("side_bets").insert({
+}): Promise<string> {
+  const { data, error } = await sb()
+    .from("side_bets")
+    .insert({
     week_number: b.week,
     creator_id: b.creatorId,
     opponent_id: b.opponentId,
     subject_id: b.subjectId,
     creator_backs: b.creatorBacks,
     amount: b.amount,
-  });
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  return data.id as string;
 }
 
 export async function respondSideBet(id: string, status: "accepted" | "declined") {
