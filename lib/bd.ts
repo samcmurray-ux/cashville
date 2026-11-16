@@ -803,12 +803,19 @@ async function syncLossFines(weekNum: number) {
   }
 }
 
-// When a fine has to be paid by: the start of the weekend after its week.
+// When a fine has to be paid by: before the following week's bet is placed,
+// i.e. the Friday 6pm pick deadline after the fine's week (week dates are
+// Saturdays, so that's six days on at 18:00).
 export function fineDeadline(fine: Fine, weeks: ViewWeek[]): Date {
   const wk = fine.week != null ? weeks.find((w) => w.week === fine.week) : null;
-  const base = new Date(wk?.date ?? fine.createdAt);
-  base.setDate(base.getDate() + 7);
-  return base;
+  if (wk) {
+    const d = new Date(wk.date + "T18:00:00");
+    d.setDate(d.getDate() + 6);
+    return d;
+  }
+  const d = new Date(fine.createdAt);
+  d.setDate(d.getDate() + 7);
+  return d;
 }
 
 // Add the "unpaid fine" surcharge to anything that sailed past its deadline.

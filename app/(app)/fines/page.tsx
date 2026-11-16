@@ -118,7 +118,7 @@ export default function FinesPage() {
                 ? "late-payment charge"
                 : overdue
                   ? "overdue"
-                  : `pay by ${deadline.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}`}
+                  : `pay by ${deadline.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })} 6pm`}
           </span>
         </button>
         {overdue && (
@@ -560,11 +560,11 @@ function RulesCard({ bd, onSaved }: { bd: BD; onSaved: () => void }) {
 
   const rules: { key: (typeof NUM_KEYS)[number]; title: string; text: string; unit: string }[] = [
     { key: "lateFine", title: "Late pick", text: "Pick not in on time.", unit: "€" },
-    { key: "lossFine", title: "Losing leg", text: "Your pick loses. Added automatically when it's marked lost.", unit: "€" },
+    { key: "lossFine", title: "Losing leg", text: "Your pick loses, from the first loss. Goes into the kitty. Added automatically when it's marked lost.", unit: "€" },
     { key: "topup2", title: "2 losses in a row", text: "On top of the fine, add this to next week's bet.", unit: "€" },
     { key: "topup3", title: "3 losses in a row", text: "On top of the fine, add this to next week's bet.", unit: "€" },
     { key: "streak4Fine", title: "4 losses in a row", text: "Bigger fine instead of the usual one, plus a 1-month ban.", unit: "€" },
-    { key: "overdueFine", title: "Unpaid fine", text: "Extra charge if a fine isn't paid before the start of the following weekend.", unit: "€" },
+    { key: "overdueFine", title: "Unpaid fine", text: "Added on top if a fine isn't paid before the following week's bet is placed (Friday 6pm).", unit: "€" },
     { key: "sideBetTaxPct", title: "Side bet tax", text: "Share of side-bet winnings that goes to the pot.", unit: "%" },
   ];
 
