@@ -20,11 +20,9 @@ import {
   computeGroupCost,
   computeHallOfFame,
   computeHeatStrip,
-  computePickMix,
   heatColor,
   computeMVP,
   computeNearMisses,
-  computeSportSpecialist,
 } from "@/lib/stats";
 
 export default function RecordsPage() {
@@ -38,10 +36,8 @@ export default function RecordsPage() {
       form: computeForm(bd),
       near: computeNearMisses(bd),
       groupCost: computeGroupCost(bd),
-      sport: computeSportSpecialist(bd),
       hall: computeHallOfFame(bd),
       heat: computeHeatStrip(bd),
-      mix: computePickMix(bd),
     };
   }, [bd]);
 
@@ -313,76 +309,6 @@ export default function RecordsPage() {
           >
             gross payout missed, split equally between each week's losers
           </p>
-        </div>
-      </Card>
-
-      {/* ─── Sport Specialist ────────────────────────────────── */}
-      <Card accent="var(--c-denim)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-denim)">Specialist Subject</Eyebrow>
-          <Headline size={32}>What they bet on, and how it goes</Headline>
-          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
-            min 3 picks to qualify ↓
-          </Scribble>
-        </div>
-        <div>
-          {data.sport.map((s, i) => (
-            <div
-              key={s.player.id}
-              className="px-4 py-3 flex items-center gap-3"
-              style={{ borderTop: i === 0 ? "none" : "1px solid var(--c-rule)" }}
-            >
-              <Avatar player={s.player} size={32} />
-              <div className="min-w-0 flex-1">
-                <div
-                  className="font-display"
-                  style={{ fontSize: 16, color: "var(--c-ink)", lineHeight: 1.1 }}
-                >
-                  {s.player.name}
-                </div>
-                {(() => {
-                  const mix = data.mix.find((m) => m.player.id === s.player.id);
-                  return mix && mix.slices.length ? (
-                    <div
-                      className="font-mono"
-                      style={{ fontSize: 10.5, color: "var(--c-dim)", marginTop: 2 }}
-                    >
-                      Bets on:{" "}
-                      {mix.slices
-                        .slice(0, 3)
-                        .map((x) => `${x.sport} ${Math.round(x.pct * 100)}%`)
-                        .join(" · ")}
-                    </div>
-                  ) : null;
-                })()}
-                {s.best ? (
-                  <div className="flex gap-3 mt-1 flex-wrap">
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: 11, color: "var(--c-forest)" }}
-                    >
-                      🎯 {s.best.sport} {Math.round(s.best.rate * 100)}% ({s.best.won}/{s.best.played})
-                    </span>
-                    {s.cursed && s.cursed.sport !== s.best.sport && (
-                      <span
-                        className="font-mono"
-                        style={{ fontSize: 11, color: "var(--c-burgundy)" }}
-                      >
-                        💀 {s.cursed.sport} {Math.round(s.cursed.rate * 100)}% ({s.cursed.won}/{s.cursed.played})
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div
-                    className="font-mono uppercase"
-                    style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--c-faint)", marginTop: 2 }}
-                  >
-                    not enough picks in any one sport yet
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
       </Card>
 

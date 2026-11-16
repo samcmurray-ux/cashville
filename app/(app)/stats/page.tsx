@@ -1,25 +1,28 @@
 "use client";
 
-// Stats — the banter screen. Six sections, top-to-bottom:
+// Stats — the banter screen, top-to-bottom:
+//   Last Weekend   · auto-written recap of the latest settled week
 //   Pecking Order  · who's hitting and who isn't
-//   Honours Wall   · auto-computed awards w/ slag copy
-//   Damage Report  · per-player W/L/P stacked bars
+//   Honours List   · trophies judged on recent form, with rotating banter
 //   Blame Game     · solo kills + € cost per player (two mini charts)
-//   Heat Strip     · rows = players, cols = weeks, colored W/L/P cells
-//   Pick Mix       · per-player sport breakdown donut
+//   Fines League · Vibes Table · Side Bet Ledger
 
 import { useMemo } from "react";
 import { useBD } from "@/lib/useBD";
 import { Avatar, Card, Chip, Eyebrow, Headline, Scribble, SPORT_COLORS } from "@/components/primitives";
 import { fmtMoney } from "@/lib/bd";
-import type { Player } from "@/lib/types";
+import type { BD, Player } from "@/lib/types";
 import {
-  computeAwards,
-  computeHeatStrip,
-  computePickMix,
   computePlayerStats,
-  heatColor,
 } from "@/lib/stats";
+import {
+  FORM_WINDOW,
+  computeAwards,
+  computeFinesLeague,
+  computeRecap,
+  computeSideBetLedger,
+  computeVibes,
+} from "@/lib/honours";
 
 export default function StatsPage() {
   const { bd } = useBD();
@@ -30,7 +33,7 @@ export default function StatsPage() {
     if (!bd) {
       return {
         stats: [],
-        awards: [],
+        awards: [] as ReturnType<typeof computeAwards>,
         sortedByHit: [],
         byKills: [],
         byCost: [],
@@ -39,7 +42,7 @@ export default function StatsPage() {
     const s = computePlayerStats(bd);
     return {
       stats: s,
-      awards: computeAwards(bd, s),
+      awards: computeAwards(bd),
       sortedByHit: [...s].sort((a, b) => b.hitRate - a.hitRate),
       // Blame Game — each chart ranks by its own metric (a kill on a 20.0
       // week costs more than two kills on 4.0 weeks, so the orders differ).
@@ -59,6 +62,8 @@ export default function StatsPage() {
 
   return (
     <div className="px-4 py-4 space-y-4">
+      <LastWeekend bd={bd} />
+
       {/* ─── Pecking Order ────────────────────────────────────── */}
       <Card accent="var(--c-denim)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
@@ -153,9 +158,10 @@ export default function StatsPage() {
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
           <Eyebrow color="var(--c-mustard)">Honours List</Eyebrow>
-          {/* Count derives from the awards array so it never goes stale when
-              we add or remove an award. */}
           <Headline size={32}>{awards.length} trophies, {awards.length} convictions</Headline>
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            form trophies go on the last {FORM_WINDOW} weeks ↓
+          </Scribble>
         </div>
         <div className="grid grid-cols-2">
           {awards.map((a, i) => (
@@ -165,33 +171,45 @@ export default function StatsPage() {
               style={{
                 borderTop: i >= 2 ? "1px solid var(--c-rule)" : "none",
                 borderRight: i % 2 === 0 ? "1px solid var(--c-rule)" : "none",
+                background: a.takenFrom ? "rgba(200,146,22,0.10)" : undefined,
               }}
             >
               <div className="flex items-center gap-2 mb-1.5">
-                <Avatar player={a.winner.player} size={28} />
+                <Avatar player={a.winner} size={28} />
                 <div
-                  className="font-stamp uppercase"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.16em",
-                    color: a.color,
-                  }}
+                  className="font-stamp uppercase min-w-0 flex-1"
+                  style={{ fontSize: 10, letterSpacing: "0.16em", color: a.color }}
                 >
                   {a.title}
                 </div>
+                {a.takenFrom && (
+                  <span
+                    className="font-stamp uppercase shrink-0"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: "0.12em",
+                      padding: "1px 5px",
+                      borderRadius: 2,
+                      background: "var(--c-mustard)",
+                      color: "var(--c-ink)",
+                    }}
+                  >
+                    New
+                  </span>
+                )}
               </div>
               <div
                 className="font-display"
                 style={{ fontSize: 18, color: "var(--c-ink)", lineHeight: 1.1 }}
               >
-                {a.winner.player.name}
+                {a.winner.name}
               </div>
               <div
                 className="font-mono uppercase"
                 style={{
                   fontSize: 10,
                   color: a.color,
-                  letterSpacing: "0.16em",
+                  letterSpacing: "0.12em",
                   marginTop: 2,
                   fontWeight: 600,
                 }}
@@ -200,15 +218,18 @@ export default function StatsPage() {
               </div>
               <p
                 className="font-body italic"
-                style={{
-                  fontSize: 12,
-                  color: "var(--c-ink-soft)",
-                  marginTop: 6,
-                  lineHeight: 1.3,
-                }}
+                style={{ fontSize: 12, color: "var(--c-ink-soft)", marginTop: 6, lineHeight: 1.3 }}
               >
                 "{a.slag}"
               </p>
+              <div
+                className="font-mono uppercase"
+                style={{ fontSize: 8.5, letterSpacing: "0.1em", color: "var(--c-faint)", marginTop: 6, lineHeight: 1.5 }}
+              >
+                {a.takenFrom ? `taken from ${a.takenFrom.name} · ` : ""}
+                {a.basis}
+                {a.allTime ? ` · all season: ${a.allTime.name}` : ""}
+              </div>
             </div>
           ))}
         </div>
@@ -287,6 +308,9 @@ export default function StatsPage() {
         )}
       </Card>
 
+      <FinesLeague bd={bd} />
+      <VibesTable bd={bd} />
+      <SideBetLedgerCard bd={bd} />
     </div>
   );
 }
@@ -332,5 +356,243 @@ function BlameBar({
         {display}
       </span>
     </div>
+  );
+}
+
+// ─── Last weekend ────────────────────────────────────────────────────────
+function LastWeekend({ bd }: { bd: BD }) {
+  const r = useMemo(() => computeRecap(bd), [bd]);
+  if (!r) return null;
+  const w = r.week;
+  const names = (ps: Player[]) => ps.map((p) => p.name).join(", ");
+  const money = (rows: { player: Player; amount: number }[]) =>
+    rows.map((x) => `${x.player.name} ${fmtMoney(x.amount)}`).join(" · ");
+  const lines: { icon: string; label: string; text: string; color?: string }[] = [];
+  if (r.hero) lines.push({ icon: "🦸", label: "Hero", text: `${r.hero.player.name} · ${r.hero.sel} @ ${r.hero.odds.toFixed(2)}`, color: "var(--c-forest)" });
+  if (r.villain) {
+    lines.push({
+      icon: "🦹",
+      label: r.villain.solo ? "Villain · killed it alone" : "Villain",
+      text: `${r.villain.player.name} · ${r.villain.sel} @ ${r.villain.odds.toFixed(2)}`,
+      color: "var(--c-burgundy)",
+    });
+  }
+  if (r.star) lines.push({ icon: "⭐", label: "Bet of the week", text: `${r.star.player.name} · ${r.star.votes} vote${r.star.votes === 1 ? "" : "s"}` });
+  if (r.poo) lines.push({ icon: "💩", label: "Stinker of the week", text: `${r.poo.player.name} · ${r.poo.votes} vote${r.poo.votes === 1 ? "" : "s"}` });
+  if (r.fines.length) lines.push({ icon: "🟥", label: "Fines handed out", text: money(r.fines) });
+  if (r.topups.length) lines.push({ icon: "🔥", label: "Top-ups on the next bet", text: money(r.topups) });
+  for (const b of r.sideBets) lines.push({ icon: "🤝", label: "Side bet", text: `${b.winner.name} took ${fmtMoney(b.amount)} off ${b.loser.name}` });
+
+  return (
+    <Card accent={w.accaWon ? "var(--c-forest)" : "var(--c-burgundy)"}>
+      <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+        <Eyebrow color={w.accaWon ? "var(--c-forest)" : "var(--c-burgundy)"}>
+          Last weekend · week {w.week}
+        </Eyebrow>
+        <Headline size={32}>
+          {w.accaWon
+            ? `It landed — ${fmtMoney(w.payout)}`
+            : r.losers.length === 1
+              ? `${r.losers[0].name} killed it`
+              : `${r.losers.length} legs let us down`}
+        </Headline>
+        <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+          {w.accaWon
+            ? `all in at ${w.combinedOdds.toFixed(2)}`
+            : `${names(r.losers)} · would've paid ${fmtMoney(w.stake * w.combinedOdds)}`}
+        </Scribble>
+      </div>
+      {lines.map((l, i) => (
+        <div
+          key={i}
+          className="px-4 py-2.5 flex items-center gap-3"
+          style={{ borderTop: i === 0 ? "none" : "1px solid var(--c-rule)" }}
+        >
+          <span style={{ fontSize: 20, width: 26, textAlign: "center" }}>{l.icon}</span>
+          <div className="min-w-0 flex-1">
+            <div className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: "0.16em", color: l.color ?? "var(--c-dim)", fontWeight: 600 }}>
+              {l.label}
+            </div>
+            <div className="font-body" style={{ fontSize: 14, color: "var(--c-ink)", marginTop: 1 }}>
+              {l.text}
+            </div>
+          </div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+// Shared shell for the three small league tables below.
+function TableCard({
+  accent,
+  eyebrow,
+  title,
+  note,
+  empty,
+  children,
+}: {
+  accent: string;
+  eyebrow: string;
+  title: string;
+  note?: string;
+  empty?: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card accent={accent}>
+      <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+        <Eyebrow color={accent}>{eyebrow}</Eyebrow>
+        <Headline size={32}>{title}</Headline>
+        {note && (
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            {note}
+          </Scribble>
+        )}
+      </div>
+      {empty ? (
+        <div className="p-5 text-center">
+          <Scribble color="var(--c-dim)" size={18} rotate={-1}>
+            {empty}
+          </Scribble>
+        </div>
+      ) : (
+        children
+      )}
+    </Card>
+  );
+}
+
+function TableRow({
+  player,
+  first,
+  sub,
+  value,
+  valueColor,
+}: {
+  player: Player;
+  first: boolean;
+  sub: string;
+  value: string;
+  valueColor?: string;
+}) {
+  return (
+    <div
+      className="px-4 py-2.5 flex items-center gap-3"
+      style={{ borderTop: first ? "none" : "1px solid var(--c-rule)" }}
+    >
+      <Avatar player={player} size={28} />
+      <div className="min-w-0 flex-1">
+        <div className="font-display" style={{ fontSize: 16, color: "var(--c-ink)", lineHeight: 1.1 }}>
+          {player.name}
+        </div>
+        <div className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--c-dim)", marginTop: 2 }}>
+          {sub}
+        </div>
+      </div>
+      <div className="font-display shrink-0" style={{ fontSize: 20, lineHeight: 1, color: valueColor ?? "var(--c-ink)" }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function FinesLeague({ bd }: { bd: BD }) {
+  const rows = computeFinesLeague(bd);
+  const total = rows.reduce((a, r) => a + r.total, 0);
+  return (
+    <TableCard
+      accent="var(--c-burgundy)"
+      eyebrow="Fines League"
+      title="Who's funding the trip"
+      note={total > 0 ? `${fmtMoney(total)} in fines so far ↓` : undefined}
+      empty={total === 0 ? "no fines yet — give it a week" : null}
+    >
+      {rows.map((r, i) => (
+        <TableRow
+          key={r.player.id}
+          player={r.player}
+          first={i === 0}
+          sub={
+            r.count === 0
+              ? "clean record"
+              : `${r.count} fine${r.count === 1 ? "" : "s"}${r.late ? ` · ${r.late} late` : ""}${r.owed > 0 ? ` · owes ${fmtMoney(r.owed)}` : " · all paid"}`
+          }
+          value={fmtMoney(r.total)}
+          valueColor={r.owed > 0 ? "var(--c-burgundy)" : r.total > 0 ? "var(--c-ink)" : "var(--c-faint)"}
+        />
+      ))}
+    </TableCard>
+  );
+}
+
+function VibesTable({ bd }: { bd: BD }) {
+  const rows = computeVibes(bd).sort((a, b) => b.backed - b.doubted - (a.backed - a.doubted));
+  const any = rows.some((r) => r.backed + r.doubted + r.calls > 0);
+  return (
+    <TableCard
+      accent="var(--c-denim)"
+      eyebrow="Vibes Table"
+      title="Who the group believes in"
+      note={any ? "👍 minus 👎 on their picks ↓" : undefined}
+      empty={any ? null : "no vibes votes yet — get voting on the slip"}
+    >
+      {rows.map((r, i) => {
+        const net = r.backed - r.doubted;
+        return (
+          <TableRow
+            key={r.player.id}
+            player={r.player}
+            first={i === 0}
+            sub={`👍 ${r.backed} · 👎 ${r.doubted} · ${r.calls ? `calls ${r.right}/${r.calls} right` : "no calls judged yet"}`}
+            value={net > 0 ? `+${net}` : String(net)}
+            valueColor={net > 0 ? "var(--c-forest)" : net < 0 ? "var(--c-burgundy)" : "var(--c-faint)"}
+          />
+        );
+      })}
+    </TableCard>
+  );
+}
+
+function SideBetLedgerCard({ bd }: { bd: BD }) {
+  const { rows, owed, live } = computeSideBetLedger(bd);
+  const any = rows.some((r) => r.bets > 0);
+  return (
+    <TableCard
+      accent="var(--c-forest)"
+      eyebrow="Side Bet Ledger"
+      title="Who's fleecing who"
+      note={live > 0 ? `${live} bet${live === 1 ? "" : "s"} still live ↓` : undefined}
+      empty={any ? null : live > 0 ? "bets are on — waiting for results" : "no side bets settled yet — offer one on the slip"}
+    >
+      {owed.length > 0 && (
+        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--c-rule)", background: "var(--c-bg2)" }}>
+          <div className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: "0.16em", color: "var(--c-burgundy)", fontWeight: 600 }}>
+            Still to square up
+          </div>
+          {owed.map((o, i) => (
+            <div key={i} className="font-body" style={{ fontSize: 14, color: "var(--c-ink)", marginTop: 3 }}>
+              {o.from.name} owes {o.to.name} {fmtMoney(o.amount)}
+              {o.tax > 0 ? ` + ${fmtMoney(o.tax)} to the pot` : ""}{" "}
+              <span className="font-mono" style={{ fontSize: 10, color: "var(--c-dim)" }}>
+                W{o.week}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {rows
+        .filter((r) => r.bets > 0)
+        .map((r, i) => (
+          <TableRow
+            key={r.player.id}
+            player={r.player}
+            first={i === 0}
+            sub={`won ${r.won} · lost ${r.lost}`}
+            value={fmtMoney(r.net, { alwaysSign: true })}
+            valueColor={r.net > 0 ? "var(--c-forest)" : r.net < 0 ? "var(--c-burgundy)" : "var(--c-faint)"}
+          />
+        ))}
+    </TableCard>
   );
 }
