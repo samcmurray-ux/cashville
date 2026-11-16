@@ -16,6 +16,7 @@ export function EditStakeSheet({
   weekNum,
   stake,
   topups = [],
+  autoTopups = 0,
   onSaved,
 }: {
   open: boolean;
@@ -24,6 +25,8 @@ export function EditStakeSheet({
   stake: number;
   // Losing-streak top-ups owed on this week's bet, e.g. Jamie +€15.
   topups?: { name: string; amount: number }[];
+  // Top-ups the app has already added to this week's total.
+  autoTopups?: number;
   onSaved?: () => void;
 }) {
   const [text, setText] = useState(String(stake));
@@ -46,7 +49,7 @@ export function EditStakeSheet({
     setSaving(true);
     try {
       // The stake column is whole euros.
-      await setWeekStake(weekNum, Math.round(value));
+      await setWeekStake(weekNum, Math.max(0, Math.round(value) - autoTopups));
       onSaved?.();
       onClose();
     } catch (e) {
@@ -92,23 +95,27 @@ export function EditStakeSheet({
             className="font-mono mt-1.5"
             style={{ fontSize: 10, color: "var(--c-dim)", letterSpacing: "0.1em" }}
           >
-            {valid ? `€${+(value / 7).toFixed(2)} a head across 7 players` : " "}
+            {autoTopups > 0
+              ? `Total on the bet · includes €${autoTopups} of automatic streak top-ups`
+              : valid
+                ? `€${+(value / 7).toFixed(2)} a head across 7 players`
+                : "\u00a0"}
           </p>
         </div>
 
         {topups.length > 0 && (
           <button
             type="button"
-            onClick={() => setText(String(70 + topups.reduce((a, t) => a + t.amount, 0)))}
+            onClick={() => setText(String(stake + topups.reduce((a, t) => a + t.amount, 0)))}
             className="w-full text-left p-3"
             style={{ border: "1.5px dashed var(--c-burgundy)", borderRadius: 2 }}
           >
             <span className="font-mono uppercase block" style={{ fontSize: 9.5, letterSpacing: "0.14em", color: "var(--c-burgundy)" }}>
-              Losing-streak top-ups due
+              Losing-streak top-ups not added yet
             </span>
             <span className="font-body block" style={{ fontSize: 14, color: "var(--c-ink)", marginTop: 2 }}>
               {topups.map((t) => `${t.name} +€${t.amount}`).join(" · ")} → tap for €
-              {70 + topups.reduce((a, t) => a + t.amount, 0)}
+              {stake + topups.reduce((a, t) => a + t.amount, 0)}
             </span>
           </button>
         )}

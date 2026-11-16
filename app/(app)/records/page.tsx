@@ -12,15 +12,16 @@
 import { useMemo, useState } from "react";
 import { useBD } from "@/lib/useBD";
 import { Avatar, Card, Eyebrow, Headline, Scribble, Stamp } from "@/components/primitives";
-import { CumulativeChart } from "@/components/line-chart";
 import { WeekDetailSheet } from "@/components/week-detail-sheet";
 import { fmtMoney } from "@/lib/bd";
 import type { Player } from "@/lib/types";
 import {
-  computeCumulative,
   computeForm,
   computeGroupCost,
   computeHallOfFame,
+  computeHeatStrip,
+  computePickMix,
+  heatColor,
   computeMVP,
   computeNearMisses,
   computeSportSpecialist,
@@ -39,7 +40,8 @@ export default function RecordsPage() {
       groupCost: computeGroupCost(bd),
       sport: computeSportSpecialist(bd),
       hall: computeHallOfFame(bd),
-      cumulative: computeCumulative(bd),
+      heat: computeHeatStrip(bd),
+      mix: computePickMix(bd),
     };
   }, [bd]);
 
@@ -118,7 +120,7 @@ export default function RecordsPage() {
       {/* ─── Current Form ────────────────────────────────────── */}
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-mustard)">Current Form</Eyebrow>
+          <Eyebrow color="var(--c-mustard)">Form &amp; Streaks</Eyebrow>
           <Headline size={32}>Hot &amp; cold</Headline>
           <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
             who's flying, who's flailing ↓
@@ -188,6 +190,34 @@ export default function RecordsPage() {
               </div>
             );
           })}
+        </div>
+        {/* The whole season at a glance — one square per week. */}
+        <div className="px-4 pt-3" style={{ borderTop: "1px solid var(--c-rule)" }}>
+          <div className="flex gap-3 flex-wrap items-center">
+            <span
+              className="font-mono uppercase"
+              style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--c-dim)", fontWeight: 600 }}
+            >
+              Whole season
+            </span>
+            <Legend label="W" color="var(--c-forest)" />
+            <Legend label="L" color="var(--c-burgundy)" />
+            <Legend label="P" color="var(--c-push)" />
+          </div>
+        </div>
+        <div className="px-4 py-3 overflow-x-auto">
+          <div
+            className="grid"
+            style={{
+              gridTemplateColumns: `60px repeat(${data.heat[0]?.cells.length ?? 0}, 14px)`,
+              gap: 3,
+              alignItems: "center",
+            }}
+          >
+            {data.heat.map((row) => (
+              <Row key={row.player.id} player={row.player} cells={row.cells} />
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -290,7 +320,7 @@ export default function RecordsPage() {
       <Card accent="var(--c-denim)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
           <Eyebrow color="var(--c-denim)">Specialist Subject</Eyebrow>
-          <Headline size={32}>Golden &amp; cursed sports</Headline>
+          <Headline size={32}>What they bet on, and how it goes</Headline>
           <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
             min 3 picks to qualify ↓
           </Scribble>
@@ -310,6 +340,21 @@ export default function RecordsPage() {
                 >
                   {s.player.name}
                 </div>
+                {(() => {
+                  const mix = data.mix.find((m) => m.player.id === s.player.id);
+                  return mix && mix.slices.length ? (
+                    <div
+                      className="font-mono"
+                      style={{ fontSize: 10.5, color: "var(--c-dim)", marginTop: 2 }}
+                    >
+                      Bets on:{" "}
+                      {mix.slices
+                        .slice(0, 3)
+                        .map((x) => `${x.sport} ${Math.round(x.pct * 100)}%`)
+                        .join(" · ")}
+                    </div>
+                  ) : null;
+                })()}
                 {s.best ? (
                   <div className="flex gap-3 mt-1 flex-wrap">
                     <span
@@ -408,17 +453,6 @@ export default function RecordsPage() {
         )}
       </Card>
 
-      {/* ─── Season Form (cumulative line chart) ─────────────── */}
-      <Card accent="var(--c-forest)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-forest)">Season Form</Eyebrow>
-          <Headline size={32}>Hit rate over time</Headline>
-        </div>
-        <div className="px-4 py-4">
-          <CumulativeChart weeks={data.cumulative.weeks} series={data.cumulative.series} />
-        </div>
-      </Card>
-
       <WeekDetailSheet
         open={openWeek != null}
         onClose={() => setOpenWeek(null)}
@@ -466,5 +500,72 @@ function MoneyBar({
         {fmtMoney(value)}
       </span>
     </div>
+  );
+}
+
+function Legend({ label, color }: { label: string; color: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span
+        className="inline-block"
+        style={{
+          width: 10,
+          height: 10,
+          background: color,
+          borderRadius: 1,
+        }}
+      />
+      <span
+        className="font-mono uppercase"
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.18em",
+          color: "var(--c-dim)",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function Row({
+  player,
+  cells,
+}: {
+  player: import("@/lib/types").Player;
+  cells: import("@/lib/stats").HeatCell[];
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Avatar player={player} size={20} />
+        <span
+          className="font-mono"
+          style={{
+            fontSize: 11,
+            color: "var(--c-ink)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {player.name.slice(0, 4)}
+        </span>
+      </div>
+      {cells.map((c) => (
+        <div
+          key={c.week}
+          title={`Wk ${c.week}: ${c.result || "—"}`}
+          style={{
+            width: 14,
+            height: 14,
+            background: heatColor(c.result),
+            border:
+              c.result === ""
+                ? "1px dashed var(--c-rule-strong)"
+                : "none",
+          }}
+        />
+      ))}
+    </>
   );
 }

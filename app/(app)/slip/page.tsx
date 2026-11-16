@@ -60,13 +60,21 @@ export default function SlipPage() {
   const nextW = idx >= 0 && idx < allWeeks.length - 1 ? allWeeks[idx + 1] : null;
 
   // Losing-streak consequences for this week's bet: top-ups and bans.
+  // Top-ups are normally added automatically when the loss is marked; one
+  // that's due but not on the books yet shows as a reminder instead.
   const streaks = lossStreaks(bd.weeks, week.week);
+  const autoTopups = week.topups.reduce((a, t) => a + t.amount, 0);
   const streakNotes = bd.v2Ready
     ? bd.players
-        .map((p) => ({ name: p.name, streak: streaks[p.id] ?? 0, ...streakPenalty(streaks[p.id] ?? 0, bd.settings) }))
-        .filter((x) => x.topup > 0 || x.banned)
+        .map((p) => {
+          const streak = streaks[p.id] ?? 0;
+          const applied = week.topups.find((t) => t.playerId === p.id)?.amount ?? 0;
+          const penalty = streakPenalty(streak, bd.settings);
+          return { name: p.name, streak, applied, due: applied ? 0 : penalty.topup, banned: penalty.banned };
+        })
+        .filter((x) => x.applied > 0 || x.due > 0 || x.banned)
     : [];
-  const topups = streakNotes.filter((x) => x.topup > 0).map((x) => ({ name: x.name, amount: x.topup }));
+  const topups = streakNotes.filter((x) => x.due > 0).map((x) => ({ name: x.name, amount: x.due }));
 
   const placer = bd.players.find((p) => p.id === week.placerId) ?? null;
   const weekVotes = bd.votes.filter((v) => v.week === week.week);
@@ -332,9 +340,9 @@ export default function SlipPage() {
             label="Stake"
             value={fmtMoney(week.stake)}
             sub={
-              week.accaWon
-                ? `€${+(week.stake / 7).toFixed(2)} a head`
-                : `€${+(week.stake / 7).toFixed(2)} a head · ✎ edit`
+              (autoTopups > 0
+                ? `incl. €${autoTopups} top-ups`
+                : `€${+(week.stake / 7).toFixed(2)} a head`) + (week.accaWon ? "" : " · ✎ edit")
             }
             // Stake is locked once an acca has landed — the win is already
             // logged in the pot at the old stake.
@@ -382,7 +390,11 @@ export default function SlipPage() {
             {streakNotes.map((x) => (
               <div key={x.name}>
                 🔥 {x.name} · {x.streak} losses in a row ·{" "}
-                {x.banned ? "1-month ban" : `adds €${x.topup} to this bet`}
+                {x.banned
+                  ? "1-month ban"
+                  : x.applied
+                    ? `€${x.applied} added to this bet`
+                    : `owes €${x.due} on this bet · tap Stake to add`}
               </div>
             ))}
           </div>
@@ -472,6 +484,7 @@ export default function SlipPage() {
           weekNum={week.week}
           stake={week.stake}
           topups={topups}
+          autoTopups={autoTopups}
           onSaved={() => void reload()}
         />
       )}

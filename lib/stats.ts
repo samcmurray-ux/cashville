@@ -118,6 +118,12 @@ export type Award = {
 };
 
 const SLAG: Record<string, string[]> = {
+  starMan: ["The people's champion. Insufferable about it."],
+  stinker: ["Voted worst in show. Repeatedly."],
+  mystic: ["Knows who's going to bottle it before they do."],
+  jinx: ["Back him and it loses. Doubt him and it wins."],
+  sinBin: ["Single-handedly funding the trip."],
+  lateMerchant: ["Friday 1pm is more of a suggestion."],
   banker: [
     "Boring. Effective. Boring.",
     "Statistically the only one trying.",
@@ -233,7 +239,7 @@ export function computeAwards(bd: BD, stats: PlayerStats[]): Award[] {
   const comebackKing = comebacks[0];
   const comebackWinner = stats.find((s) => s.player.id === comebackKing.player.id)!;
 
-  return [
+  const awards: Award[] = [
     {
       key: "banker",
       title: "The Banker",
@@ -299,6 +305,105 @@ export function computeAwards(bd: BD, stats: PlayerStats[]): Award[] {
       color: "var(--c-denim)",
     },
   ];
+
+  // ── Awards from votes and fines — only handed out once there's data. ──
+  const statOf = (id: string) => stats.find((x) => x.player.id === id);
+  const top = (counts: Record<string, number>, lowest = false) => {
+    const rows = Object.entries(counts).sort((a, b) => (lowest ? a[1] - b[1] : b[1] - a[1]));
+    return rows.length && statOf(rows[0][0]) ? { winner: statOf(rows[0][0])!, n: rows[0][1] } : null;
+  };
+  const tally = <T,>(items: T[], key: (t: T) => string, weight: (t: T) => number = () => 1) => {
+    const out: Record<string, number> = {};
+    for (const it of items) out[key(it)] = (out[key(it)] || 0) + weight(it);
+    return out;
+  };
+
+  const stars = top(tally(bd.votes.filter((v) => v.kind === "star"), (v) => v.targetId));
+  if (stars) {
+    awards.push({
+      key: "starMan",
+      title: "Star Man",
+      winner: stars.winner,
+      value: `${stars.n} ⭐ vote${stars.n === 1 ? "" : "s"}`,
+      slag: pickSlag("starMan"),
+      color: "var(--c-mustard)",
+    });
+  }
+  const poos = top(tally(bd.votes.filter((v) => v.kind === "poo"), (v) => v.targetId));
+  if (poos) {
+    awards.push({
+      key: "stinker",
+      title: "The Stinker",
+      winner: poos.winner,
+      value: `${poos.n} 💩 vote${poos.n === 1 ? "" : "s"}`,
+      slag: pickSlag("stinker"),
+      color: "var(--c-brick)",
+    });
+  }
+
+  // Vibes: how often each voter's 👍/👎 called the result. Min 3 calls.
+  const calls: Record<string, { right: number; total: number }> = {};
+  for (const v of bd.votes) {
+    if (v.kind !== "win" && v.kind !== "lose") continue;
+    const result = bd.weeks
+      .find((w) => w.week === v.week)
+      ?.picks.find((p) => p.playerId === v.targetId)?.result;
+    if (result !== "Won" && result !== "Lost") continue;
+    const c = (calls[v.voterId] ||= { right: 0, total: 0 });
+    c.total++;
+    if ((v.kind === "win") === (result === "Won")) c.right++;
+  }
+  const callers = Object.entries(calls)
+    .filter(([id, c]) => c.total >= 3 && statOf(id))
+    .map(([id, c]) => ({ id, ...c, rate: c.right / c.total }))
+    .sort((a, b) => b.rate - a.rate || b.total - a.total);
+  if (callers.length) {
+    const best = callers[0];
+    awards.push({
+      key: "mystic",
+      title: "Mystic Meg",
+      winner: statOf(best.id)!,
+      value: `${best.right}/${best.total} calls right`,
+      slag: pickSlag("mystic"),
+      color: "var(--c-denim)",
+    });
+    const worst = callers[callers.length - 1];
+    if (worst.id !== best.id) {
+      awards.push({
+        key: "jinx",
+        title: "The Jinx",
+        winner: statOf(worst.id)!,
+        value: `${worst.right}/${worst.total} calls right`,
+        slag: pickSlag("jinx"),
+        color: "var(--c-burgundy)",
+      });
+    }
+  }
+
+  const fined = top(tally(bd.fines, (f) => f.playerId, (f) => f.amount));
+  if (fined) {
+    awards.push({
+      key: "sinBin",
+      title: "Sin Bin King",
+      winner: fined.winner,
+      value: `€${Math.round(fined.n)} in fines`,
+      slag: pickSlag("sinBin"),
+      color: "var(--c-burgundy)",
+    });
+  }
+  const late = top(tally(bd.fines.filter((f) => f.kind === "late"), (f) => f.playerId));
+  if (late) {
+    awards.push({
+      key: "lateMerchant",
+      title: "Late Merchant",
+      winner: late.winner,
+      value: `${late.n} late pick${late.n === 1 ? "" : "s"}`,
+      slag: pickSlag("lateMerchant"),
+      color: "var(--c-mustard)",
+    });
+  }
+
+  return awards;
 }
 
 // ─── Heat Strip data — rows = players, cols = weeks ─────────────────────

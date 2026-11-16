@@ -23,8 +23,10 @@ import {
   deleteFine,
   fineDeadline,
   fmtMoney,
+  lossStreaks,
   saveSettings,
   setFinePaid,
+  streakPenalty,
   updateFine,
 } from "@/lib/bd";
 import type { BD, Fine, FineKind, Settings } from "@/lib/types";
@@ -208,6 +210,8 @@ export default function FinesPage() {
         </Card>
       )}
 
+      <StreaksCard bd={bd} />
+
       <RulesCard bd={bd} onSaved={() => void reload()} />
 
       <button
@@ -238,6 +242,87 @@ export default function FinesPage() {
         />
       )}
     </div>
+  );
+}
+
+// ─── Losing streaks ──────────────────────────────────────────────────────
+// Where everyone stands right now: how many they've lost
+// in a row, what that costs on this week's bet, and what another loss
+// would cost. Fines per player are totalled alongside.
+function StreaksCard({ bd }: { bd: BD }) {
+  const s = bd.settings;
+  // Counting every result marked so far, including this week's.
+  const streaks = lossStreaks(bd.weeks, Number.MAX_SAFE_INTEGER);
+  const rows = bd.players
+    .map((p) => {
+      const streak = streaks[p.id] ?? 0;
+      const mine = bd.fines.filter((f) => f.playerId === p.id);
+      return {
+        player: p,
+        streak,
+        now: streakPenalty(streak, s),
+        nextFine: streak + 1 >= 4 ? s.streak4Fine : s.lossFine,
+        next: streakPenalty(streak + 1, s),
+        fined: mine.reduce((a, f) => a + f.amount, 0),
+        count: mine.length,
+      };
+    })
+    .sort((a, b) => b.streak - a.streak);
+
+  return (
+    <Card accent="var(--c-mustard)">
+      <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+        <Eyebrow color="var(--c-ink)">Losing streaks · as it stands</Eyebrow>
+      </div>
+      {rows.map((r, i) => (
+        <div
+          key={r.player.id}
+          className="px-4 py-3 flex items-center gap-3"
+          style={{ borderTop: i === 0 ? "none" : "1px solid var(--c-rule)" }}
+        >
+          <Avatar player={r.player} size={32} />
+          <div className="min-w-0 flex-1">
+            <div className="font-display" style={{ fontSize: 17, color: "var(--c-ink)", lineHeight: 1.1 }}>
+              {r.player.name}
+            </div>
+            <div
+              className="font-mono uppercase"
+              style={{
+                fontSize: 9.5,
+                letterSpacing: "0.08em",
+                marginTop: 3,
+                lineHeight: 1.5,
+                color: r.now.banned || r.now.topup > 0 ? "var(--c-burgundy)" : "var(--c-dim)",
+              }}
+            >
+              {r.now.banned
+                ? "banned for a month"
+                : r.now.topup > 0
+                  ? `€${r.now.topup} top-up on the next bet`
+                  : r.streak === 0
+                    ? "clean slate"
+                    : "fined, nothing extra yet"}
+              <br />
+              <span style={{ color: "var(--c-dim)" }}>
+                loses again → €{r.nextFine} fine
+                {r.next.banned ? " + ban" : r.next.topup > 0 ? ` + €${r.next.topup} on next bet` : ""}
+              </span>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div
+              className="font-display"
+              style={{ fontSize: 22, lineHeight: 1, color: r.streak > 0 ? "var(--c-burgundy)" : "var(--c-faint)" }}
+            >
+              {r.streak > 0 ? `${"🔥".repeat(Math.min(r.streak, 4))} ${r.streak}` : "0"}
+            </div>
+            <div className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--c-dim)", marginTop: 3 }}>
+              {r.count > 0 ? `${r.count} fine${r.count === 1 ? "" : "s"} · ${fmtMoney(r.fined)}` : "no fines"}
+            </div>
+          </div>
+        </div>
+      ))}
+    </Card>
   );
 }
 

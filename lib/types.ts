@@ -73,7 +73,9 @@ export type ViewWeek = {
   date: string;
   picks: ViewPick[];
   combinedOdds: number;
+  // Total on the bet: the base stake plus any automatic streak top-ups.
   stake: number;
+  topups: { playerId: string; amount: number }[];
   payout: number;
   accaWon: boolean;
   filled: boolean;

@@ -36,6 +36,7 @@ type Raw = {
   fines: Record<string, any>[] | null;
   votes: Record<string, any>[] | null;
   sideBets: Record<string, any>[] | null;
+  topups: Record<string, any>[];
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -54,7 +55,7 @@ export const DEFAULT_STAKE = 70;
 
 export async function fetchAll(): Promise<Raw> {
   const client = sb();
-  const [players, weeks, picks, movements, trips, settings, fines, votes, sideBets] = await Promise.all([
+  const [players, weeks, picks, movements, trips, settings, fines, votes, sideBets, topups] = await Promise.all([
     client.from("players").select("*").order("name"),
     client.from("weeks").select("*").order("week_number"),
     client.from("picks").select("*"),
@@ -64,6 +65,7 @@ export async function fetchAll(): Promise<Raw> {
     client.from("fines").select("*").order("created_at"),
     client.from("votes").select("*"),
     client.from("side_bets").select("*").order("created_at"),
+    client.from("topups").select("*"),
   ]);
   return {
     players: (players.data ?? []) as Player[],
@@ -75,6 +77,7 @@ export async function fetchAll(): Promise<Raw> {
     fines: fines.error ? null : (fines.data ?? []),
     votes: votes.error ? null : (votes.data ?? []),
     sideBets: sideBets.error ? null : (sideBets.data ?? []),
+    topups: topups.data ?? [],
   };
 }
 
@@ -88,6 +91,11 @@ export function buildView(raw: Raw): BD {
   for (const p of raw.picks) {
     (picksByWeek[p.week_number] ||= []).push(p);
   }
+
+  const topupsFor = (weekNum: number) =>
+    raw.topups
+      .filter((t) => t.week_number === weekNum)
+      .map((t) => ({ playerId: t.player_id as string, amount: +t.amount }));
 
   const weeks: ViewWeek[] = raw.weeks.map((w) => {
     const wkPicks = picksByWeek[w.week_number] ?? [];
@@ -143,7 +151,10 @@ export function buildView(raw: Raw): BD {
       // to 1 on a fresh week-insert (which would otherwise hide the live
       // total until someone settled).
       combinedOdds: +combined.toFixed(2),
-      stake: w.stake_per_acca ?? DEFAULT_STAKE,
+      stake:
+        (w.stake_per_acca ?? DEFAULT_STAKE) +
+        topupsFor(w.week_number).reduce((a, t) => a + t.amount, 0),
+      topups: topupsFor(w.week_number),
       payout: +(w.payout ?? 0),
       accaWon: !!w.acca_won,
       filled,
@@ -194,7 +205,9 @@ export function buildView(raw: Raw): BD {
         notes: "",
       })),
       combinedOdds: 0,
-      stake: DEFAULT_STAKE,
+      stake:
+        DEFAULT_STAKE + topupsFor(currentWeekNum!).reduce((a, t) => a + t.amount, 0),
+      topups: topupsFor(currentWeekNum!),
       payout: 0,
       accaWon: false,
       filled: false,
@@ -343,7 +356,8 @@ async function ensureWeekRow(weekNum: number) {
   }
 }
 
-// Change the acca stake for a week (defaults to €70 when never set).
+// Change the base acca stake for a week (defaults to €70 when never set).
+// Automatic streak top-ups are added on top of this.
 export async function setWeekStake(weekNum: number, stake: number) {
   await ensureWeekRow(weekNum);
   const { error } = await sb()
@@ -439,7 +453,13 @@ export async function setPickResult(
     .select("stake_per_acca")
     .eq("week_number", weekNum)
     .maybeSingle();
-  const stake = weekRow?.stake_per_acca ?? DEFAULT_STAKE;
+  const { data: weekTopups } = await client
+    .from("topups")
+    .select("amount")
+    .eq("week_number", weekNum);
+  const stake =
+    (weekRow?.stake_per_acca ?? DEFAULT_STAKE) +
+    (weekTopups ?? []).reduce((a, t) => a + +t.amount, 0);
   const payout = allWon ? Math.round(stake * combinedOdds) : 0;
 
   await client
@@ -724,7 +744,7 @@ export function streakPenalty(streak: number, s: Settings): { topup: number; ban
 async function syncLossFines(weekNum: number) {
   const client = sb();
   const [{ data: st }, { data: picks }, { data: existing, error }] = await Promise.all([
-    client.from("app_settings").select("loss_fine, streak4_fine, fines_from_week").limit(1),
+    client.from("app_settings").select("loss_fine, streak4_fine, topup_2, topup_3, fines_from_week").limit(1),
     client.from("picks").select("player_id, result, week_number").lte("week_number", weekNum),
     client.from("fines").select("id, player_id, paid").eq("week_number", weekNum).eq("kind", "loss"),
   ]);
@@ -733,18 +753,38 @@ async function syncLossFines(weekNum: number) {
   const lost = new Set(
     picks.filter((p) => p.week_number === weekNum && p.result === "Lost").map((p) => p.player_id),
   );
+  const streakFor = (id: string) =>
+    streakOf(
+      picks
+        .filter((p) => p.player_id === id)
+        .sort((a, b) => b.week_number - a.week_number)
+        .map((p) => p.result ?? ""),
+    );
+
+  // Top-ups on NEXT week's bet: 2 or 3 losses in a row. Rebuilt from
+  // scratch for this week each time, so correcting a result undoes it.
+  const topups = [...lost]
+    .map((id) => {
+      const streak = streakFor(id);
+      const amount =
+        streak === 2
+          ? num(st?.[0]?.topup_2, DEFAULT_SETTINGS.topup2)
+          : streak === 3
+            ? num(st?.[0]?.topup_3, DEFAULT_SETTINGS.topup3)
+            : 0;
+      return { week_number: weekNum + 1, source_week: weekNum, player_id: id, amount };
+    })
+    .filter((t) => t.amount > 0);
+  await client.from("topups").delete().eq("source_week", weekNum);
+  if (topups.length) await client.from("topups").insert(topups);
+
   const have = new Set((existing ?? []).map((f) => f.player_id));
   const toAdd = [...lost].filter((id) => !have.has(id));
   const toDrop = (existing ?? []).filter((f) => !lost.has(f.player_id) && !f.paid);
   if (toAdd.length) {
     await client.from("fines").insert(
       toAdd.map((id) => {
-        const streak = streakOf(
-          picks
-            .filter((p) => p.player_id === id)
-            .sort((a, b) => b.week_number - a.week_number)
-            .map((p) => p.result ?? ""),
-        );
+        const streak = streakFor(id);
         return {
           week_number: weekNum,
           player_id: id,
