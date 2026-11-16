@@ -70,7 +70,7 @@ async function save(sub: PushSubscription, playerId: string) {
   if (error) throw error;
 }
 
-export async function enablePush(playerId: string) {
+export async function enablePush(playerId: string): Promise<string> {
   if (!pushSupported()) throw new Error("This browser can't do notifications");
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
@@ -84,7 +84,22 @@ export async function enablePush(playerId: string) {
     (await reg.pushManager.getSubscription()) ??
     (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(data.publicKey) }));
   await save(sub, playerId);
-  notify({ kind: "test", playerId });
+  return sendTest(playerId);
+}
+
+// Ask the server to push a test to this player and say how it went.
+export async function sendTest(playerId: string): Promise<string> {
+  const { data, error } = await sb().functions.invoke("push", {
+    body: { type: "event", event: { kind: "test", playerId } },
+  });
+  if (error) throw new Error("The notification service didn't answer");
+  const results = (data?.results ?? []) as { status: number | string; service: string; detail?: string }[];
+  if (!results.length) throw new Error("This phone isn't registered — turn notifications off and on again");
+  const bad = results.filter((r) => typeof r.status !== "number" || r.status >= 300);
+  if (bad.length === results.length) {
+    throw new Error(`The phone's push service refused it (${bad[0].status}${bad[0].detail ? `: ${bad[0].detail}` : ""})`);
+  }
+  return `Test sent to ${results.length - bad.length} device${results.length - bad.length === 1 ? "" : "s"} — it should pop up within a few seconds.`;
 }
 
 export async function disablePush() {

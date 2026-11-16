@@ -11,6 +11,7 @@ import {
   enablePush,
   needsInstallFirst,
   pushSupported,
+  sendTest,
   syncPushPlayer,
 } from "@/lib/push";
 
@@ -19,6 +20,7 @@ export function PushCard() {
   const [state, setState] = useState<"loading" | "unsupported" | "install" | "off" | "on">("loading");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -40,12 +42,13 @@ export function PushCard() {
   const toggle = async () => {
     setBusy(true);
     setError(null);
+    setNote(null);
     try {
       if (state === "on") {
         await disablePush();
         setState("off");
       } else {
-        await enablePush(me.id);
+        setNote(await enablePush(me.id));
         setState("on");
       }
     } catch (e) {
@@ -67,6 +70,32 @@ export function PushCard() {
                 ? `On for ${me.name} on this phone.`
                 : "Get a nudge for picks, results, fines and side bets."}
           </div>
+          {note && !error && (
+            <div className="font-mono mt-1.5" style={{ fontSize: 11, color: "var(--c-forest)" }}>
+              ✓ {note}
+            </div>
+          )}
+          {state === "on" && (
+            <button
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                setNote(null);
+                try {
+                  setNote(await sendTest(me.id));
+                } catch (e) {
+                  setError((e as Error).message || "Test failed");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              disabled={busy}
+              className="font-mono uppercase mt-1.5"
+              style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--c-denim)", textDecoration: "underline" }}
+            >
+              Send me a test
+            </button>
+          )}
           {error && (
             <div className="font-mono mt-1.5" style={{ fontSize: 11, color: "var(--c-burgundy)" }}>
               ⚠ {error}
