@@ -232,6 +232,18 @@ export function Postmark({
   );
 }
 
+// Three of the group start with "Ja", so initials are spelled out here
+// the way the group chat does it (JT = James, JC = Jack).
+const INITIALS: Record<string, string> = {
+  sam: "SA",
+  jamie: "JM",
+  james: "JT",
+  jack: "JC",
+  hebo: "HE",
+  conor: "CO",
+  rob: "RO",
+};
+
 // ─── Avatar (player initials + colored bg + ink border) ────────────────
 export function Avatar({
   player,
@@ -243,7 +255,7 @@ export function Avatar({
   ring?: string;
 }) {
   if (!player) return null;
-  const initials = player.name.slice(0, 2).toUpperCase();
+  const initials = INITIALS[player.id] ?? player.name.slice(0, 2).toUpperCase();
   const bg = `oklch(0.58 0.14 ${player.hue})`;
   return (
     <div

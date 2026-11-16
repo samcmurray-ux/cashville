@@ -16,6 +16,7 @@ export function SlipRow({
   isCurrent,
   onAdd,
   onSetResult,
+  extra,
 }: {
   pick: ViewPick;
   player: Player;
@@ -28,6 +29,8 @@ export function SlipRow({
   // via setPickResult in lib/bd.ts (which also auto-rolls up the week if
   // this is the 7th settle).
   onSetResult?: (result: Result | null) => void;
+  // Shown beside the sport chip on a filled row (the votes chip).
+  extra?: React.ReactNode;
 }) {
   const filled = pick.filled;
   const settled =
@@ -105,12 +108,14 @@ export function SlipRow({
           </div>
         )}
         {filled && pick.sport && (
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
             <Chip color={sportColor} small>
               {pick.sport}
             </Chip>
+            {extra}
           </div>
         )}
+        {filled && !pick.sport && extra && <div className="mt-1.5">{extra}</div>}
       </div>
       <div className="text-right shrink-0">
         <div

@@ -30,6 +30,7 @@ import {
   updateFine,
 } from "@/lib/bd";
 import type { BD, Fine, FineKind, Settings } from "@/lib/types";
+import { fireMoment } from "@/components/moments";
 
 const KIND_COLOR: Record<FineKind, string> = {
   late: "var(--c-mustard)",
@@ -370,6 +371,7 @@ function FineSheet({
           amount: amt,
           reason,
         });
+        fireMoment("fined");
       }
       onSaved();
       onClose();

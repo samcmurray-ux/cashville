@@ -18,7 +18,8 @@ const KINDS: { kind: VoteKind; icon: string; label: string; sub: string }[] = [
   { kind: "lose", icon: "👎", label: "It'll lose", sub: "vibes" },
 ];
 
-// The compact strip under a slip row. Tapping it opens the sheet.
+// One compact chip on a slip row: only the vote types that have votes are
+// shown, or just "Vote" when there are none. Tapping it opens the sheet.
 export function VoteStrip({
   votes,
   meId,
@@ -28,31 +29,36 @@ export function VoteStrip({
   meId: string | null;
   onOpen: () => void;
 }) {
+  const counts = KINDS.map(({ kind, icon }) => ({
+    kind,
+    icon,
+    n: votes.filter((v) => v.kind === kind).length,
+  })).filter((c) => c.n > 0);
+  const mine = !!meId && votes.some((v) => v.voterId === meId);
   return (
     <button
       onClick={onOpen}
       aria-label="Votes"
-      className="flex items-center gap-2 font-mono"
-      style={{ fontSize: 11, color: "var(--c-dim)" }}
+      className="inline-flex items-center gap-1.5 font-mono"
+      style={{
+        fontSize: 11,
+        color: "var(--c-ink-soft)",
+        padding: "2px 8px",
+        borderRadius: 999,
+        border: `1px solid ${mine ? "var(--c-mustard)" : "var(--c-rule-strong)"}`,
+        background: mine ? "rgba(200,146,22,0.15)" : "transparent",
+        lineHeight: 1.5,
+      }}
     >
-      {KINDS.map(({ kind, icon }) => {
-        const n = votes.filter((v) => v.kind === kind).length;
-        const mine = !!meId && votes.some((v) => v.kind === kind && v.voterId === meId);
-        return (
-          <span
-            key={kind}
-            style={{
-              padding: "1px 5px",
-              borderRadius: 999,
-              border: `1px solid ${mine ? "var(--c-mustard)" : "var(--c-rule)"}`,
-              background: mine ? "rgba(200,146,22,0.15)" : "transparent",
-              opacity: n === 0 && !mine ? 0.45 : 1,
-            }}
-          >
-            {icon} {n}
+      {counts.length === 0 ? (
+        <span style={{ letterSpacing: "0.08em" }}>⭐ Vote</span>
+      ) : (
+        counts.map((c) => (
+          <span key={c.kind}>
+            {c.icon} {c.n}
           </span>
-        );
-      })}
+        ))
+      )}
     </button>
   );
 }

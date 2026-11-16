@@ -17,6 +17,7 @@ import { EditStakeSheet } from "@/components/edit-stake-sheet";
 import { WeekInfoSheet } from "@/components/week-info-sheet";
 import { VoteStrip, VotesSheet } from "@/components/votes";
 import { SideBetsCard } from "@/components/side-bets";
+import { fireMoment } from "@/components/moments";
 
 export default function SlipPage() {
   const { bd, reload } = useBD();
@@ -308,24 +309,34 @@ export default function SlipPage() {
                 isMe={meId === p.playerId}
                 isCurrent={isCurrent}
                 onAdd={() => setEditingPlayer(p.playerId)}
+                extra={
+                  bd.v2Ready && p.filled ? (
+                    <VoteStrip
+                      votes={weekVotes.filter((v) => v.targetId === p.playerId)}
+                      meId={meId}
+                      onOpen={() => setVotingPlayer(p.playerId)}
+                    />
+                  ) : null
+                }
                 onSetResult={async (result) => {
                   // setPickResult also auto-rolls up the week if this is
                   // the 7th settle (and logs the win movement if it landed).
                   // Realtime push will re-render everyone.
+                  const others = week.picks.filter((x) => x.playerId !== p.playerId);
                   await setPickResult(week.week, p.playerId, result);
+                  // The first loss kills the slip; the seventh win lands it.
+                  if (result === "Lost" && p.result !== "Lost" && !others.some((x) => x.result === "Lost")) {
+                    fireMoment("killed");
+                  } else if (
+                    result === "Won" &&
+                    others.length === 6 &&
+                    others.every((x) => x.filled && x.result === "Won")
+                  ) {
+                    fireMoment("landed");
+                  }
                   await reload();
                 }}
               />
-              {/* Votes: ⭐ 💩 👍 👎 — tap to see who voted and cast yours. */}
-              {bd.v2Ready && p.filled && (
-                <div className="px-4 pb-2.5" style={{ marginTop: -4, paddingLeft: 82 }}>
-                  <VoteStrip
-                    votes={weekVotes.filter((v) => v.targetId === p.playerId)}
-                    meId={meId}
-                    onOpen={() => setVotingPlayer(p.playerId)}
-                  />
-                </div>
-              )}
               </div>
             );
           })}
