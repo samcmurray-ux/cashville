@@ -3,7 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/lib/useTheme";
 
 export const metadata: Metadata = {
-  title: "Ca$hville Tracker",
+  title: "Ca$hville",
   description: "Seven players, one slip a week, the long road to Nashville.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -12,7 +12,11 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    icon: "/icons/icon.svg",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
   },
 };
 

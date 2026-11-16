@@ -1,29 +1,29 @@
 "use client";
 
-// Fixed bottom tab nav — always visible across the 4 P0 routes.
+// Fixed bottom tab nav — always visible.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Four tabs. Fines lives under Pot, and Records + History under Stats —
+// `match` lists every route that keeps a tab lit (see SubTabs).
 const TABS = [
-  { href: "/slip", label: "Slip", icon: SlipIcon },
-  { href: "/pot", label: "Pot", icon: PotIcon },
-  { href: "/fines", label: "Fines", icon: FinesIcon },
-  { href: "/stats", label: "Stats", icon: StatsIcon },
-  { href: "/records", label: "Records", icon: RecordsIcon },
-  { href: "/history", label: "History", icon: HistoryIcon },
+  { href: "/home", label: "Home", icon: HomeIcon, match: ["/home"] },
+  { href: "/slip", label: "Slip", icon: SlipIcon, match: ["/slip"] },
+  { href: "/pot", label: "Pot", icon: PotIcon, match: ["/pot", "/fines"] },
+  { href: "/stats", label: "Stats", icon: StatsIcon, match: ["/stats", "/records", "/history"] },
 ] as const;
 
 export function BottomNav() {
   const path = usePathname();
   return (
     <nav
-      className="fixed left-0 right-0 bottom-0 z-40 border-t border-rule-strong bg-paper pb-safe"
+      className="cv-nav fixed left-0 right-0 bottom-0 z-40 border-t border-rule-strong bg-paper pb-safe"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 6px)" }}
     >
-      <div className="grid grid-cols-6 max-w-md mx-auto">
-        {TABS.map(({ href, label, icon: Icon }) => {
-          const active = path === href || path.startsWith(href + "/");
+      <div className="grid grid-cols-4 max-w-md mx-auto">
+        {TABS.map(({ href, label, icon: Icon, match }) => {
+          const active = match.some((m) => path === m || path.startsWith(m + "/"));
           return (
             <Link
               key={href}
@@ -38,8 +38,8 @@ export function BottomNav() {
               <span
                 className="font-stamp uppercase"
                 style={{
-                  fontSize: 10,
-                  letterSpacing: "0.06em",
+                  fontSize: 11,
+                  letterSpacing: "0.1em",
                   marginTop: 2,
                 }}
               >
@@ -54,6 +54,14 @@ export function BottomNav() {
 }
 
 // Tiny inline icons — kept stroke-based so they inherit the nav color.
+function HomeIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
+      <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4v-9z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function SlipIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
@@ -73,40 +81,10 @@ function PotIcon({ active }: { active: boolean }) {
   );
 }
 
-function FinesIcon({ active }: { active: boolean }) {
-  // Referee's whistle-ish card — the sin bin.
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
-      <rect x="6" y="3" width="12" height="18" rx="1.5" strokeLinejoin="round" />
-      <path d="M12 8v5M12 16.5v.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function StatsIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
       <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function RecordsIcon({ active }: { active: boolean }) {
-  // Trophy — the deep-cuts / hall-of-fame tab.
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
-      <path d="M7 4h10v4a5 5 0 01-10 0V4z" strokeLinejoin="round" />
-      <path d="M7 5H4v2a3 3 0 003 3M17 5h3v2a3 3 0 01-3 3" strokeLinecap="round" />
-      <path d="M12 13v3M9 20h6M10 20l.5-4M14 20l-.5-4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function HistoryIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" strokeLinecap="round" />
     </svg>
   );
 }

@@ -4,6 +4,7 @@
 // Postmark + headline + scribbles + "switch player" affordance.
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMe } from "@/lib/useMe";
 import type { Player } from "@/lib/types";
 import { Avatar, Headline, Postmark, Scribble } from "./primitives";
@@ -14,14 +15,83 @@ export function AppHeader({
   players,
   currentWeekNum,
   playedCount,
+  compact,
 }: {
   players: Player[];
   currentWeekNum: number;
   playedCount: number;
+  // Slim one-line bar, used everywhere except the Home screen.
+  compact?: boolean;
 }) {
   const { me, setMeId } = useMe();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
+
+  const pickers = (
+    <>
+      <PlayerPicker
+        players={players}
+        open={pickerOpen || !me}
+        onClose={() => setPickerOpen(false)}
+      />
+      <ThemePicker
+        open={themePickerOpen}
+        onClose={() => setThemePickerOpen(false)}
+      />
+    </>
+  );
+
+  if (compact) {
+    return (
+      <header
+        className="px-4 py-2 flex items-center gap-3"
+        style={{ borderBottom: "3px double var(--c-rule-strong)" }}
+      >
+        <Link href="/home" className="cv-logo-sm font-display" style={{ fontSize: 26, color: "var(--c-ink)", lineHeight: 1 }}>
+          Ca<span style={{ color: "var(--c-mustard)", fontStyle: "italic" }}>$</span>hville
+        </Link>
+        <span
+          className="font-mono uppercase flex-1"
+          style={{ fontSize: 10, letterSpacing: "0.2em", color: "var(--c-burgundy)", fontWeight: 600 }}
+        >
+          Week {currentWeekNum}
+        </span>
+        <button
+          onClick={() => setThemePickerOpen(true)}
+          aria-label="Switch theme"
+          className="grid shrink-0"
+          style={{
+            gridTemplateColumns: "1fr 1fr",
+            gap: 1,
+            width: 28,
+            height: 28,
+            padding: 6,
+            borderRadius: "50%",
+            border: "1.5px solid var(--c-rule-strong)",
+            background: "var(--c-paper)",
+          }}
+        >
+          <span style={{ background: "var(--c-burgundy)" }} />
+          <span style={{ background: "var(--c-mustard)" }} />
+          <span style={{ background: "var(--c-forest)" }} />
+          <span style={{ background: "var(--c-denim)" }} />
+        </button>
+        <button onClick={() => setPickerOpen(true)} aria-label="Switch player" className="shrink-0">
+          {me ? (
+            <Avatar player={me} size={30} ring="var(--c-mustard)" />
+          ) : (
+            <span
+              className="font-stamp inline-flex items-center justify-center rounded-full border-2 border-dashed"
+              style={{ width: 30, height: 30, borderColor: "var(--c-burgundy)", color: "var(--c-burgundy)" }}
+            >
+              ?
+            </span>
+          )}
+        </button>
+        {pickers}
+      </header>
+    );
+  }
 
   return (
     <header
@@ -46,11 +116,13 @@ export function AppHeader({
           >
             {playedCount} weeks logged · season 25/26
           </div>
-          <Headline size={44} family="display">
-            Ca
-            <span style={{ color: "var(--c-mustard)", fontStyle: "italic" }}>$</span>
-            hville
-          </Headline>
+          <div className="cv-logo">
+            <Headline size={44} family="display">
+              Ca
+              <span style={{ color: "var(--c-mustard)", fontStyle: "italic" }}>$</span>
+              hville
+            </Headline>
+          </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <Scribble color="var(--c-burgundy)" size={17} rotate={-1.5}>
               seven gents · one slip ·
@@ -129,15 +201,7 @@ export function AppHeader({
         </div>
       </div>
 
-      <PlayerPicker
-        players={players}
-        open={pickerOpen || !me}
-        onClose={() => setPickerOpen(false)}
-      />
-      <ThemePicker
-        open={themePickerOpen}
-        onClose={() => setThemePickerOpen(false)}
-      />
+      {pickers}
     </header>
   );
 }

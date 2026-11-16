@@ -12,18 +12,17 @@
 import { useMemo, useState } from "react";
 import { useBD } from "@/lib/useBD";
 import { Avatar, Card, Eyebrow, Headline, Scribble, Stamp } from "@/components/primitives";
-import { CumulativeChart } from "@/components/line-chart";
 import { WeekDetailSheet } from "@/components/week-detail-sheet";
 import { fmtMoney } from "@/lib/bd";
 import type { Player } from "@/lib/types";
 import {
-  computeCumulative,
   computeForm,
   computeGroupCost,
   computeHallOfFame,
+  computeHeatStrip,
+  heatColor,
   computeMVP,
   computeNearMisses,
-  computeSportSpecialist,
 } from "@/lib/stats";
 
 export default function RecordsPage() {
@@ -37,9 +36,8 @@ export default function RecordsPage() {
       form: computeForm(bd),
       near: computeNearMisses(bd),
       groupCost: computeGroupCost(bd),
-      sport: computeSportSpecialist(bd),
       hall: computeHallOfFame(bd),
-      cumulative: computeCumulative(bd),
+      heat: computeHeatStrip(bd),
     };
   }, [bd]);
 
@@ -118,7 +116,7 @@ export default function RecordsPage() {
       {/* ─── Current Form ────────────────────────────────────── */}
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-mustard)">Current Form</Eyebrow>
+          <Eyebrow color="var(--c-mustard)">Form &amp; Streaks</Eyebrow>
           <Headline size={32}>Hot &amp; cold</Headline>
           <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
             who's flying, who's flailing ↓
@@ -188,6 +186,34 @@ export default function RecordsPage() {
               </div>
             );
           })}
+        </div>
+        {/* The whole season at a glance — one square per week. */}
+        <div className="px-4 pt-3" style={{ borderTop: "1px solid var(--c-rule)" }}>
+          <div className="flex gap-3 flex-wrap items-center">
+            <span
+              className="font-mono uppercase"
+              style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--c-dim)", fontWeight: 600 }}
+            >
+              Whole season
+            </span>
+            <Legend label="W" color="var(--c-forest)" />
+            <Legend label="L" color="var(--c-burgundy)" />
+            <Legend label="P" color="var(--c-push)" />
+          </div>
+        </div>
+        <div className="px-4 py-3 overflow-x-auto">
+          <div
+            className="grid"
+            style={{
+              gridTemplateColumns: `60px repeat(${data.heat[0]?.cells.length ?? 0}, 14px)`,
+              gap: 3,
+              alignItems: "center",
+            }}
+          >
+            {data.heat.map((row) => (
+              <Row key={row.player.id} player={row.player} cells={row.cells} />
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -286,61 +312,6 @@ export default function RecordsPage() {
         </div>
       </Card>
 
-      {/* ─── Sport Specialist ────────────────────────────────── */}
-      <Card accent="var(--c-denim)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-denim)">Specialist Subject</Eyebrow>
-          <Headline size={32}>Golden &amp; cursed sports</Headline>
-          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
-            min 3 picks to qualify ↓
-          </Scribble>
-        </div>
-        <div>
-          {data.sport.map((s, i) => (
-            <div
-              key={s.player.id}
-              className="px-4 py-3 flex items-center gap-3"
-              style={{ borderTop: i === 0 ? "none" : "1px solid var(--c-rule)" }}
-            >
-              <Avatar player={s.player} size={32} />
-              <div className="min-w-0 flex-1">
-                <div
-                  className="font-display"
-                  style={{ fontSize: 16, color: "var(--c-ink)", lineHeight: 1.1 }}
-                >
-                  {s.player.name}
-                </div>
-                {s.best ? (
-                  <div className="flex gap-3 mt-1 flex-wrap">
-                    <span
-                      className="font-mono"
-                      style={{ fontSize: 11, color: "var(--c-forest)" }}
-                    >
-                      🎯 {s.best.sport} {Math.round(s.best.rate * 100)}% ({s.best.won}/{s.best.played})
-                    </span>
-                    {s.cursed && s.cursed.sport !== s.best.sport && (
-                      <span
-                        className="font-mono"
-                        style={{ fontSize: 11, color: "var(--c-burgundy)" }}
-                      >
-                        💀 {s.cursed.sport} {Math.round(s.cursed.rate * 100)}% ({s.cursed.won}/{s.cursed.played})
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div
-                    className="font-mono uppercase"
-                    style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--c-faint)", marginTop: 2 }}
-                  >
-                    not enough picks in any one sport yet
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
       {/* ─── Hall of Fame ────────────────────────────────────── */}
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
@@ -408,17 +379,6 @@ export default function RecordsPage() {
         )}
       </Card>
 
-      {/* ─── Season Form (cumulative line chart) ─────────────── */}
-      <Card accent="var(--c-forest)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-forest)">Season Form</Eyebrow>
-          <Headline size={32}>Hit rate over time</Headline>
-        </div>
-        <div className="px-4 py-4">
-          <CumulativeChart weeks={data.cumulative.weeks} series={data.cumulative.series} />
-        </div>
-      </Card>
-
       <WeekDetailSheet
         open={openWeek != null}
         onClose={() => setOpenWeek(null)}
@@ -466,5 +426,72 @@ function MoneyBar({
         {fmtMoney(value)}
       </span>
     </div>
+  );
+}
+
+function Legend({ label, color }: { label: string; color: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span
+        className="inline-block"
+        style={{
+          width: 10,
+          height: 10,
+          background: color,
+          borderRadius: 1,
+        }}
+      />
+      <span
+        className="font-mono uppercase"
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.18em",
+          color: "var(--c-dim)",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function Row({
+  player,
+  cells,
+}: {
+  player: import("@/lib/types").Player;
+  cells: import("@/lib/stats").HeatCell[];
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Avatar player={player} size={20} />
+        <span
+          className="font-mono"
+          style={{
+            fontSize: 11,
+            color: "var(--c-ink)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {player.name.slice(0, 4)}
+        </span>
+      </div>
+      {cells.map((c) => (
+        <div
+          key={c.week}
+          title={`Wk ${c.week}: ${c.result || "—"}`}
+          style={{
+            width: 14,
+            height: 14,
+            background: heatColor(c.result),
+            border:
+              c.result === ""
+                ? "1px dashed var(--c-rule-strong)"
+                : "none",
+          }}
+        />
+      ))}
+    </>
   );
 }

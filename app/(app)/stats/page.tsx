@@ -1,39 +1,37 @@
 "use client";
 
-// Stats — the banter screen. Six sections, top-to-bottom:
+// Stats — the banter screen, top-to-bottom:
 //   Pecking Order  · who's hitting and who isn't
-//   Honours Wall   · auto-computed awards w/ slag copy
-//   Damage Report  · per-player W/L/P stacked bars
+//   Honours List   · trophies judged on recent form, with rotating banter
 //   Blame Game     · solo kills + € cost per player (two mini charts)
-//   Heat Strip     · rows = players, cols = weeks, colored W/L/P cells
-//   Pick Mix       · per-player sport breakdown donut
+//   Fines League · Vibes Table · Side Bet Ledger
 
 import { useMemo } from "react";
 import { useBD } from "@/lib/useBD";
 import { Avatar, Card, Chip, Eyebrow, Headline, Scribble, SPORT_COLORS } from "@/components/primitives";
-import { Donut } from "@/components/donut";
 import { fmtMoney } from "@/lib/bd";
-import type { Player } from "@/lib/types";
+import type { BD, Player } from "@/lib/types";
 import {
-  computeAwards,
-  computeHeatStrip,
-  computePickMix,
   computePlayerStats,
-  heatColor,
 } from "@/lib/stats";
+import {
+  FORM_WINDOW,
+  computeAwards,
+  computeFinesLeague,
+  computeSideBetLedger,
+  computeVibes,
+} from "@/lib/honours";
 
 export default function StatsPage() {
   const { bd } = useBD();
 
   // All sections derive from the same `stats` array — memo so we don't
   // recompute on every interaction.
-  const { stats, awards, heat, mix, sortedByHit, byKills, byCost } = useMemo(() => {
+  const { stats, awards, sortedByHit, byKills, byCost } = useMemo(() => {
     if (!bd) {
       return {
         stats: [],
-        awards: [],
-        heat: [],
-        mix: [],
+        awards: [] as ReturnType<typeof computeAwards>,
         sortedByHit: [],
         byKills: [],
         byCost: [],
@@ -42,9 +40,7 @@ export default function StatsPage() {
     const s = computePlayerStats(bd);
     return {
       stats: s,
-      awards: computeAwards(bd, s),
-      heat: computeHeatStrip(bd),
-      mix: computePickMix(bd),
+      awards: computeAwards(bd),
       sortedByHit: [...s].sort((a, b) => b.hitRate - a.hitRate),
       // Blame Game — each chart ranks by its own metric (a kill on a 20.0
       // week costs more than two kills on 4.0 weeks, so the orders differ).
@@ -158,9 +154,10 @@ export default function StatsPage() {
       <Card accent="var(--c-mustard)">
         <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
           <Eyebrow color="var(--c-mustard)">Honours List</Eyebrow>
-          {/* Count derives from the awards array so it never goes stale when
-              we add or remove an award. */}
           <Headline size={32}>{awards.length} trophies, {awards.length} convictions</Headline>
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            form trophies go on the last {FORM_WINDOW} weeks ↓
+          </Scribble>
         </div>
         <div className="grid grid-cols-2">
           {awards.map((a, i) => (
@@ -170,33 +167,45 @@ export default function StatsPage() {
               style={{
                 borderTop: i >= 2 ? "1px solid var(--c-rule)" : "none",
                 borderRight: i % 2 === 0 ? "1px solid var(--c-rule)" : "none",
+                background: a.takenFrom ? "rgba(200,146,22,0.10)" : undefined,
               }}
             >
               <div className="flex items-center gap-2 mb-1.5">
-                <Avatar player={a.winner.player} size={28} />
+                <Avatar player={a.winner} size={28} />
                 <div
-                  className="font-stamp uppercase"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.16em",
-                    color: a.color,
-                  }}
+                  className="font-stamp uppercase min-w-0 flex-1"
+                  style={{ fontSize: 10, letterSpacing: "0.16em", color: a.color }}
                 >
                   {a.title}
                 </div>
+                {a.takenFrom && (
+                  <span
+                    className="font-stamp uppercase shrink-0"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: "0.12em",
+                      padding: "1px 5px",
+                      borderRadius: 2,
+                      background: "var(--c-mustard)",
+                      color: "var(--c-on-mustard)",
+                    }}
+                  >
+                    New
+                  </span>
+                )}
               </div>
               <div
                 className="font-display"
                 style={{ fontSize: 18, color: "var(--c-ink)", lineHeight: 1.1 }}
               >
-                {a.winner.player.name}
+                {a.winner.name}
               </div>
               <div
                 className="font-mono uppercase"
                 style={{
                   fontSize: 10,
                   color: a.color,
-                  letterSpacing: "0.16em",
+                  letterSpacing: "0.12em",
                   marginTop: 2,
                   fontWeight: 600,
                 }}
@@ -205,101 +214,20 @@ export default function StatsPage() {
               </div>
               <p
                 className="font-body italic"
-                style={{
-                  fontSize: 12,
-                  color: "var(--c-ink-soft)",
-                  marginTop: 6,
-                  lineHeight: 1.3,
-                }}
+                style={{ fontSize: 12, color: "var(--c-ink-soft)", marginTop: 6, lineHeight: 1.3 }}
               >
                 "{a.slag}"
               </p>
+              <div
+                className="font-mono uppercase"
+                style={{ fontSize: 8.5, letterSpacing: "0.1em", color: "var(--c-faint)", marginTop: 6, lineHeight: 1.5 }}
+              >
+                {a.takenFrom ? `taken from ${a.takenFrom.name} · ` : ""}
+                {a.basis}
+                {a.allTime ? ` · all season: ${a.allTime.name}` : ""}
+              </div>
             </div>
           ))}
-        </div>
-      </Card>
-
-      {/* ─── Damage Report ────────────────────────────────────── */}
-      <Card accent="var(--c-burgundy)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-burgundy)">Damage Report</Eyebrow>
-          <Headline size={32}>W / L / P split</Headline>
-          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
-            stacked all season, green = good ↓
-          </Scribble>
-        </div>
-        <div>
-          {stats.map((s, i) => {
-            const total = Math.max(1, s.played);
-            const wPct = (s.wins / total) * 100;
-            const lPct = (s.losses / total) * 100;
-            const pPct = (s.pushes / total) * 100;
-            return (
-              <div
-                key={s.player.id}
-                className="px-4 py-3"
-                style={{ borderTop: i === 0 ? "none" : "1px solid var(--c-rule)" }}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Avatar player={s.player} size={26} />
-                  <div
-                    className="font-display flex-1"
-                    style={{ fontSize: 15, color: "var(--c-ink)", lineHeight: 1.1 }}
-                  >
-                    {s.player.name}
-                  </div>
-                  <div
-                    className="font-mono"
-                    style={{ fontSize: 11, color: "var(--c-dim)" }}
-                  >
-                    {s.played} picks
-                  </div>
-                </div>
-                <div
-                  className="flex w-full overflow-hidden"
-                  style={{
-                    height: 16,
-                    border: "1px solid var(--c-ink)",
-                    borderRadius: 2,
-                  }}
-                  aria-label={`${s.wins} won, ${s.losses} lost, ${s.pushes} push`}
-                >
-                  {wPct > 0 && (
-                    <div
-                      style={{ width: `${wPct}%`, background: "var(--c-forest)" }}
-                      title={`${s.wins} won`}
-                    />
-                  )}
-                  {lPct > 0 && (
-                    <div
-                      style={{ width: `${lPct}%`, background: "var(--c-burgundy)" }}
-                      title={`${s.losses} lost`}
-                    />
-                  )}
-                  {pPct > 0 && (
-                    <div
-                      style={{ width: `${pPct}%`, background: "var(--c-push)" }}
-                      title={`${s.pushes} push`}
-                    />
-                  )}
-                </div>
-                {/* Tiny tagline under the bar — streak + biggest odds */}
-                <div
-                  className="font-mono uppercase mt-1.5 flex gap-3 flex-wrap"
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: "0.14em",
-                    color: "var(--c-dim)",
-                  }}
-                >
-                  <span>avg @{s.avgOdds.toFixed(2)}</span>
-                  <span>longest W: {s.longestWin}</span>
-                  <span>longest L: {s.longestLose}</span>
-                  <span>biggest: {s.biggestOdds.toFixed(2)}</span>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </Card>
 
@@ -376,93 +304,9 @@ export default function StatsPage() {
         )}
       </Card>
 
-      {/* ─── Heat Strip ──────────────────────────────────────── */}
-      <Card accent="var(--c-forest)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-forest)">Heat Strip</Eyebrow>
-          <Headline size={32}>The streak map</Headline>
-          <div className="flex gap-3 mt-2 flex-wrap">
-            <Legend label="W" color="var(--c-forest)" />
-            <Legend label="L" color="var(--c-burgundy)" />
-            <Legend label="P" color="var(--c-push)" />
-          </div>
-        </div>
-        <div className="px-4 py-3 overflow-x-auto">
-          <div
-            className="grid"
-            style={{
-              gridTemplateColumns: `60px repeat(${heat[0]?.cells.length ?? 0}, 14px)`,
-              gap: 3,
-              alignItems: "center",
-            }}
-          >
-            {heat.map((row) => (
-              <Row key={row.player.id} player={row.player} cells={row.cells} />
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* ─── Pick Mix ─────────────────────────────────────────── */}
-      <Card accent="var(--c-denim)">
-        <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
-          <Eyebrow color="var(--c-denim)">Pick Mix</Eyebrow>
-          <Headline size={32}>What each player bets on</Headline>
-        </div>
-        <div className="px-4 py-3 grid grid-cols-2 gap-3">
-          {mix.map((m) => {
-            const top = m.slices[0];
-            return (
-              <div
-                key={m.player.id}
-                className="flex items-center gap-3 p-2"
-                style={{
-                  border: "1px solid var(--c-rule)",
-                  borderRadius: 2,
-                }}
-              >
-                <Donut slices={m.slices} size={52} thickness={10} />
-                <div className="min-w-0 flex-1">
-                  <div
-                    className="font-display truncate"
-                    style={{ fontSize: 14, color: "var(--c-ink)", lineHeight: 1.1 }}
-                  >
-                    {m.player.name}
-                  </div>
-                  <div
-                    className="font-mono"
-                    style={{ fontSize: 10, color: "var(--c-dim)", marginTop: 2 }}
-                  >
-                    {top
-                      ? `${top.sport} ${Math.round(top.pct * 100)}%`
-                      : "no picks"}
-                  </div>
-                  <div className="flex gap-0.5 mt-1.5 flex-wrap">
-                    {m.slices.slice(0, 4).map((s) => (
-                      <span
-                        key={s.sport}
-                        className="font-mono"
-                        title={`${s.sport}: ${s.count}`}
-                        style={{
-                          fontSize: 8,
-                          padding: "1px 4px",
-                          background:
-                            SPORT_COLORS[s.sport] || "var(--c-dim)",
-                          color: "var(--c-paper)",
-                          letterSpacing: "0.06em",
-                          borderRadius: 1,
-                        }}
-                      >
-                        {s.sport.slice(0, 3).toUpperCase()}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+      <FinesLeague bd={bd} />
+      <VibesTable bd={bd} />
+      <SideBetLedgerCard bd={bd} />
     </div>
   );
 }
@@ -511,69 +355,176 @@ function BlameBar({
   );
 }
 
-function Legend({ label, color }: { label: string; color: string }) {
+// Shared shell for the three small league tables below.
+function TableCard({
+  accent,
+  eyebrow,
+  title,
+  note,
+  empty,
+  children,
+}: {
+  accent: string;
+  eyebrow: string;
+  title: string;
+  note?: string;
+  empty?: string | null;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center gap-1">
-      <span
-        className="inline-block"
-        style={{
-          width: 10,
-          height: 10,
-          background: color,
-          borderRadius: 1,
-        }}
-      />
-      <span
-        className="font-mono uppercase"
-        style={{
-          fontSize: 9,
-          letterSpacing: "0.18em",
-          color: "var(--c-dim)",
-        }}
-      >
-        {label}
-      </span>
+    <Card accent={accent}>
+      <div className="px-5 pt-5 pb-3" style={{ borderBottom: "1px solid var(--c-rule)" }}>
+        <Eyebrow color={accent}>{eyebrow}</Eyebrow>
+        <Headline size={32}>{title}</Headline>
+        {note && (
+          <Scribble color="var(--c-dim)" size={18} rotate={-1.5} style={{ marginTop: 4 }}>
+            {note}
+          </Scribble>
+        )}
+      </div>
+      {empty ? (
+        <div className="p-5 text-center">
+          <Scribble color="var(--c-dim)" size={18} rotate={-1}>
+            {empty}
+          </Scribble>
+        </div>
+      ) : (
+        children
+      )}
+    </Card>
+  );
+}
+
+function TableRow({
+  player,
+  first,
+  sub,
+  value,
+  valueColor,
+}: {
+  player: Player;
+  first: boolean;
+  sub: string;
+  value: string;
+  valueColor?: string;
+}) {
+  return (
+    <div
+      className="px-4 py-2.5 flex items-center gap-3"
+      style={{ borderTop: first ? "none" : "1px solid var(--c-rule)" }}
+    >
+      <Avatar player={player} size={28} />
+      <div className="min-w-0 flex-1">
+        <div className="font-display" style={{ fontSize: 16, color: "var(--c-ink)", lineHeight: 1.1 }}>
+          {player.name}
+        </div>
+        <div className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--c-dim)", marginTop: 2 }}>
+          {sub}
+        </div>
+      </div>
+      <div className="font-display shrink-0" style={{ fontSize: 20, lineHeight: 1, color: valueColor ?? "var(--c-ink)" }}>
+        {value}
+      </div>
     </div>
   );
 }
 
-function Row({
-  player,
-  cells,
-}: {
-  player: import("@/lib/types").Player;
-  cells: import("@/lib/stats").HeatCell[];
-}) {
+function FinesLeague({ bd }: { bd: BD }) {
+  const rows = computeFinesLeague(bd);
+  const total = rows.reduce((a, r) => a + r.total, 0);
   return (
-    <>
-      <div className="flex items-center gap-2">
-        <Avatar player={player} size={20} />
-        <span
-          className="font-mono"
-          style={{
-            fontSize: 11,
-            color: "var(--c-ink)",
-            letterSpacing: "0.04em",
-          }}
-        >
-          {player.name.slice(0, 4)}
-        </span>
-      </div>
-      {cells.map((c) => (
-        <div
-          key={c.week}
-          title={`Wk ${c.week}: ${c.result || "—"}`}
-          style={{
-            width: 14,
-            height: 14,
-            background: heatColor(c.result),
-            border:
-              c.result === ""
-                ? "1px dashed var(--c-rule-strong)"
-                : "none",
-          }}
+    <TableCard
+      accent="var(--c-burgundy)"
+      eyebrow="Fines League"
+      title="Who's funding the trip"
+      note={total > 0 ? `${fmtMoney(total)} in fines so far ↓` : undefined}
+      empty={total === 0 ? "no fines yet — give it a week" : null}
+    >
+      {rows.map((r, i) => (
+        <TableRow
+          key={r.player.id}
+          player={r.player}
+          first={i === 0}
+          sub={
+            r.count === 0
+              ? "clean record"
+              : `${r.count} fine${r.count === 1 ? "" : "s"}${r.late ? ` · ${r.late} late` : ""}${r.owed > 0 ? ` · owes ${fmtMoney(r.owed)}` : " · all paid"}`
+          }
+          value={fmtMoney(r.total)}
+          valueColor={r.owed > 0 ? "var(--c-burgundy)" : r.total > 0 ? "var(--c-ink)" : "var(--c-faint)"}
         />
       ))}
-    </>
+    </TableCard>
+  );
+}
+
+function VibesTable({ bd }: { bd: BD }) {
+  const rows = computeVibes(bd).sort((a, b) => b.backed - b.doubted - (a.backed - a.doubted));
+  const any = rows.some((r) => r.backed + r.doubted + r.calls > 0);
+  return (
+    <TableCard
+      accent="var(--c-denim)"
+      eyebrow="Vibes Table"
+      title="Who the group believes in"
+      note={any ? "👍 minus 👎 on their picks ↓" : undefined}
+      empty={any ? null : "no vibes votes yet — get voting on the slip"}
+    >
+      {rows.map((r, i) => {
+        const net = r.backed - r.doubted;
+        return (
+          <TableRow
+            key={r.player.id}
+            player={r.player}
+            first={i === 0}
+            sub={`👍 ${r.backed} · 👎 ${r.doubted} · ${r.calls ? `calls ${r.right}/${r.calls} right` : "no calls judged yet"}`}
+            value={net > 0 ? `+${net}` : String(net)}
+            valueColor={net > 0 ? "var(--c-forest)" : net < 0 ? "var(--c-burgundy)" : "var(--c-faint)"}
+          />
+        );
+      })}
+    </TableCard>
+  );
+}
+
+function SideBetLedgerCard({ bd }: { bd: BD }) {
+  const { rows, owed, live } = computeSideBetLedger(bd);
+  const any = rows.some((r) => r.bets > 0);
+  return (
+    <TableCard
+      accent="var(--c-forest)"
+      eyebrow="Side Bet Ledger"
+      title="Who's fleecing who"
+      note={live > 0 ? `${live} bet${live === 1 ? "" : "s"} still live ↓` : undefined}
+      empty={any ? null : live > 0 ? "bets are on — waiting for results" : "no side bets settled yet — offer one on the slip"}
+    >
+      {owed.length > 0 && (
+        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--c-rule)", background: "var(--c-bg2)" }}>
+          <div className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: "0.16em", color: "var(--c-burgundy)", fontWeight: 600 }}>
+            Still to square up
+          </div>
+          {owed.map((o, i) => (
+            <div key={i} className="font-body" style={{ fontSize: 14, color: "var(--c-ink)", marginTop: 3 }}>
+              {o.from.name} owes {o.to.name} {fmtMoney(o.amount)}
+              {o.tax > 0 ? ` + ${fmtMoney(o.tax)} to the pot` : ""}{" "}
+              <span className="font-mono" style={{ fontSize: 10, color: "var(--c-dim)" }}>
+                W{o.week}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {rows
+        .filter((r) => r.bets > 0)
+        .map((r, i) => (
+          <TableRow
+            key={r.player.id}
+            player={r.player}
+            first={i === 0}
+            sub={`won ${r.won} · lost ${r.lost}`}
+            value={fmtMoney(r.net, { alwaysSign: true })}
+            valueColor={r.net > 0 ? "var(--c-forest)" : r.net < 0 ? "var(--c-burgundy)" : "var(--c-faint)"}
+          />
+        ))}
+    </TableCard>
   );
 }

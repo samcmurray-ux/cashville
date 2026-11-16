@@ -83,6 +83,9 @@ export function BDProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, () => {
         void reload();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "topups" }, () => {
+        void reload();
+      })
       .subscribe();
 
     return () => {

@@ -23,7 +23,7 @@ create table if not exists public.app_settings (
   overdue_fine     numeric not null default 10,
   side_bet_tax_pct numeric not null default 20,
   rules_text       text    not null default
-    E'All selections must be sent before 13:00 on Friday each week. Late pick = automatic forfeit & public shame.\n\n4 losses in a row = 1-month ban (still paying in if it''s your week).\n\nLeaving the WhatsApp group is an automatic €50 into the kitty.',
+    E'All selections must be sent before 18:00 (6pm) on Friday each week. Late pick = automatic forfeit & public shame.\n\n4 losses in a row = 1-month ban (still paying in if it''s your week).\n\nLeaving the WhatsApp group is an automatic €50 into the kitty.',
   -- Losing-leg fines are only auto-created from this week on, so re-settling
   -- an old week doesn't fine anyone twice.
   fines_from_week  int     not null default 0

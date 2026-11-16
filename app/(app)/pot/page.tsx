@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useBD } from "@/lib/useBD";
 import { Card, Eyebrow, Headline, Postmark, Scribble, Chip } from "@/components/primitives";
 import { LogMovementSheet } from "@/components/log-movement-sheet";
+import { PotChart } from "@/components/pot-chart";
 import { fmtMoney } from "@/lib/bd";
 import type { ViewMovement } from "@/lib/types";
 
@@ -142,6 +143,18 @@ export default function PotPage() {
           </div>
         </div>
       </Card>
+
+      {/* The climb, week by week */}
+      {bd.movements.length > 1 && (
+        <Card accent="var(--c-forest)">
+          <div className="px-4 pt-4 pb-1">
+            <Eyebrow color="var(--c-forest)">The climb</Eyebrow>
+          </div>
+          <div className="px-3 pb-3 pt-2">
+            <PotChart movements={bd.movements} target={bd.trip.target} />
+          </div>
+        </Card>
+      )}
 
       {/* Movements ledger */}
       <Card>

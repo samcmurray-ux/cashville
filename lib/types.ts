@@ -8,6 +8,8 @@ export type Player = {
   hue: number;
   persona: string | null;
   is_admin: boolean | null;
+  // Small square image as a data: URL, uploaded by the player. Null = initials.
+  photo?: string | null;
 };
 
 export type WeekRow = {
@@ -73,7 +75,9 @@ export type ViewWeek = {
   date: string;
   picks: ViewPick[];
   combinedOdds: number;
+  // Total on the bet: the base stake plus any automatic streak top-ups.
   stake: number;
+  topups: { playerId: string; amount: number }[];
   payout: number;
   accaWon: boolean;
   filled: boolean;

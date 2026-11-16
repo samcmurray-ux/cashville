@@ -17,6 +17,7 @@ import { EditStakeSheet } from "@/components/edit-stake-sheet";
 import { WeekInfoSheet } from "@/components/week-info-sheet";
 import { VoteStrip, VotesSheet } from "@/components/votes";
 import { SideBetsCard } from "@/components/side-bets";
+import { fireMoment } from "@/components/moments";
 
 export default function SlipPage() {
   const { bd, reload } = useBD();
@@ -60,13 +61,21 @@ export default function SlipPage() {
   const nextW = idx >= 0 && idx < allWeeks.length - 1 ? allWeeks[idx + 1] : null;
 
   // Losing-streak consequences for this week's bet: top-ups and bans.
+  // Top-ups are normally added automatically when the loss is marked; one
+  // that's due but not on the books yet shows as a reminder instead.
   const streaks = lossStreaks(bd.weeks, week.week);
+  const autoTopups = week.topups.reduce((a, t) => a + t.amount, 0);
   const streakNotes = bd.v2Ready
     ? bd.players
-        .map((p) => ({ name: p.name, streak: streaks[p.id] ?? 0, ...streakPenalty(streaks[p.id] ?? 0, bd.settings) }))
-        .filter((x) => x.topup > 0 || x.banned)
+        .map((p) => {
+          const streak = streaks[p.id] ?? 0;
+          const applied = week.topups.find((t) => t.playerId === p.id)?.amount ?? 0;
+          const penalty = streakPenalty(streak, bd.settings);
+          return { name: p.name, streak, applied, due: applied ? 0 : penalty.topup, banned: penalty.banned };
+        })
+        .filter((x) => x.applied > 0 || x.due > 0 || x.banned)
     : [];
-  const topups = streakNotes.filter((x) => x.topup > 0).map((x) => ({ name: x.name, amount: x.topup }));
+  const topups = streakNotes.filter((x) => x.due > 0).map((x) => ({ name: x.name, amount: x.due }));
 
   const placer = bd.players.find((p) => p.id === week.placerId) ?? null;
   const weekVotes = bd.votes.filter((v) => v.week === week.week);
@@ -126,7 +135,7 @@ export default function SlipPage() {
                   padding: "2px 6px",
                   borderRadius: 2,
                   background: placer.id === meId ? "var(--c-mustard)" : "var(--c-bg2)",
-                  color: "var(--c-ink)",
+                  color: placer.id === meId ? "var(--c-on-mustard)" : "var(--c-ink)",
                   fontWeight: 600,
                 }}
               >
@@ -142,7 +151,7 @@ export default function SlipPage() {
               <div className="mt-1">
                 {isCurrent ? (
                   <Scribble color="var(--c-dim)" size={20} rotate={-2}>
-                    get your picks in ↓
+                    picks due Friday 6pm ↓
                   </Scribble>
                 ) : week.accaWon ? (
                   <Scribble color="var(--c-forest)" size={20} rotate={-1.5}>
@@ -237,7 +246,7 @@ export default function SlipPage() {
                 className="font-stamp uppercase ml-1"
                 style={{
                   background: "var(--c-mustard)",
-                  color: "var(--c-ink)",
+                  color: "var(--c-on-mustard)",
                   border: "none",
                   padding: "5px 9px",
                   borderRadius: 2,
@@ -267,19 +276,19 @@ export default function SlipPage() {
                 style={{
                   fontSize: 10,
                   letterSpacing: "0.2em",
-                  color: "var(--c-ink)",
+                  color: "var(--c-on-mustard)",
                 }}
               >
                 you're up, {me.name.toLowerCase()}
               </div>
               <div
                 className="font-display"
-                style={{ fontSize: 22, color: "var(--c-ink)", lineHeight: 1.1 }}
+                style={{ fontSize: 22, color: "var(--c-on-mustard)", lineHeight: 1.1 }}
               >
                 Add my pick →
               </div>
             </div>
-            <Stamp color="var(--c-ink)" rotate={-4} size="md">
+            <Stamp color="var(--c-on-mustard)" rotate={-4} size="md">
               tap to lock
             </Stamp>
           </button>
@@ -300,24 +309,34 @@ export default function SlipPage() {
                 isMe={meId === p.playerId}
                 isCurrent={isCurrent}
                 onAdd={() => setEditingPlayer(p.playerId)}
+                extra={
+                  bd.v2Ready && p.filled ? (
+                    <VoteStrip
+                      votes={weekVotes.filter((v) => v.targetId === p.playerId)}
+                      meId={meId}
+                      onOpen={() => setVotingPlayer(p.playerId)}
+                    />
+                  ) : null
+                }
                 onSetResult={async (result) => {
                   // setPickResult also auto-rolls up the week if this is
                   // the 7th settle (and logs the win movement if it landed).
                   // Realtime push will re-render everyone.
+                  const others = week.picks.filter((x) => x.playerId !== p.playerId);
                   await setPickResult(week.week, p.playerId, result);
+                  // The first loss kills the slip; the seventh win lands it.
+                  if (result === "Lost" && p.result !== "Lost" && !others.some((x) => x.result === "Lost")) {
+                    fireMoment("killed");
+                  } else if (
+                    result === "Won" &&
+                    others.length === 6 &&
+                    others.every((x) => x.filled && x.result === "Won")
+                  ) {
+                    fireMoment("landed");
+                  }
                   await reload();
                 }}
               />
-              {/* Votes: ⭐ 💩 👍 👎 — tap to see who voted and cast yours. */}
-              {bd.v2Ready && p.filled && (
-                <div className="px-4 pb-2.5" style={{ marginTop: -4, paddingLeft: 82 }}>
-                  <VoteStrip
-                    votes={weekVotes.filter((v) => v.targetId === p.playerId)}
-                    meId={meId}
-                    onOpen={() => setVotingPlayer(p.playerId)}
-                  />
-                </div>
-              )}
               </div>
             );
           })}
@@ -332,9 +351,9 @@ export default function SlipPage() {
             label="Stake"
             value={fmtMoney(week.stake)}
             sub={
-              week.accaWon
-                ? `€${+(week.stake / 7).toFixed(2)} a head`
-                : `€${+(week.stake / 7).toFixed(2)} a head · ✎ edit`
+              (autoTopups > 0
+                ? `incl. €${autoTopups} top-ups`
+                : `€${+(week.stake / 7).toFixed(2)} a head`) + (week.accaWon ? "" : " · ✎ edit")
             }
             // Stake is locked once an acca has landed — the win is already
             // logged in the pot at the old stake.
@@ -382,7 +401,11 @@ export default function SlipPage() {
             {streakNotes.map((x) => (
               <div key={x.name}>
                 🔥 {x.name} · {x.streak} losses in a row ·{" "}
-                {x.banned ? "1-month ban" : `adds €${x.topup} to this bet`}
+                {x.banned
+                  ? "1-month ban"
+                  : x.applied
+                    ? `€${x.applied} added to this bet`
+                    : `owes €${x.due} on this bet · tap Stake to add`}
               </div>
             ))}
           </div>
@@ -472,6 +495,7 @@ export default function SlipPage() {
           weekNum={week.week}
           stake={week.stake}
           topups={topups}
+          autoTopups={autoTopups}
           onSaved={() => void reload()}
         />
       )}
