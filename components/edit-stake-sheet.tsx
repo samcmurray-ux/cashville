@@ -15,12 +15,15 @@ export function EditStakeSheet({
   onClose,
   weekNum,
   stake,
+  topups = [],
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   weekNum: number;
   stake: number;
+  // Losing-streak top-ups owed on this week's bet, e.g. Jamie +€15.
+  topups?: { name: string; amount: number }[];
   onSaved?: () => void;
 }) {
   const [text, setText] = useState(String(stake));
@@ -91,6 +94,23 @@ export function EditStakeSheet({
             {valid ? `€${+(value / 7).toFixed(2)} a head across 7 players` : " "}
           </p>
         </div>
+
+        {topups.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setText(String(70 + topups.reduce((a, t) => a + t.amount, 0)))}
+            className="w-full text-left p-3"
+            style={{ border: "1.5px dashed var(--c-burgundy)", borderRadius: 2 }}
+          >
+            <span className="font-mono uppercase block" style={{ fontSize: 9.5, letterSpacing: "0.14em", color: "var(--c-burgundy)" }}>
+              Losing-streak top-ups due
+            </span>
+            <span className="font-body block" style={{ fontSize: 14, color: "var(--c-ink)", marginTop: 2 }}>
+              {topups.map((t) => `${t.name} +€${t.amount}`).join(" · ")} → tap for €
+              {70 + topups.reduce((a, t) => a + t.amount, 0)}
+            </span>
+          </button>
+        )}
 
         <div className="flex gap-2">
           {QUICK.map((q) => (

@@ -13,7 +13,7 @@ import {
   ReactNode,
 } from "react";
 import { sb } from "./supabase";
-import { fetchAll, buildView } from "./bd";
+import { fetchAll, buildView, sweepOverdueFines } from "./bd";
 import type { BD } from "./types";
 
 type Ctx = {
@@ -44,7 +44,10 @@ export function BDProvider({ children }: { children: ReactNode }) {
       try {
         const raw = await fetchAll();
         if (!mounted) return;
-        setBd(buildView(raw));
+        const view = buildView(raw);
+        setBd(view);
+        // Late-payment surcharges are added by whoever opens the app first.
+        void sweepOverdueFines(view).catch(() => {});
       } finally {
         if (mounted) setLoading(false);
       }
@@ -64,9 +67,28 @@ export function BDProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
 
+    // v2 tables get their own channel so the core slip still syncs live
+    // if supabase/migration-v2.sql hasn't been run yet.
+    const channelV2 = sb()
+      .channel("cashville-realtime-v2")
+      .on("postgres_changes", { event: "*", schema: "public", table: "fines" }, () => {
+        void reload();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "votes" }, () => {
+        void reload();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "side_bets" }, () => {
+        void reload();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, () => {
+        void reload();
+      })
+      .subscribe();
+
     return () => {
       mounted = false;
       sb().removeChannel(channel);
+      sb().removeChannel(channelV2);
     };
   }, [reload]);
 

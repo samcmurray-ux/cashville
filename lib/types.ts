@@ -18,6 +18,7 @@ export type WeekRow = {
   combined_odds: number | null;
   payout: number | null;
   notes: string | null;
+  placer_id?: string | null;
 };
 
 export type PickRow = {
@@ -79,6 +80,10 @@ export type ViewWeek = {
   wonCount: number;
   lostCount: number;
   pushCount: number;
+  // Who places the bet with the bookie. Follows the rotation unless someone
+  // set it by hand for this week (placerExplicit).
+  placerId: string | null;
+  placerExplicit: boolean;
 };
 
 export type ViewMovement = {
@@ -105,4 +110,65 @@ export type BD = {
   trip: Trip;
   movements: ViewMovement[];
   playedCount: number;
+  settings: Settings;
+  fines: Fine[];
+  votes: Vote[];
+  sideBets: SideBet[];
+  // False until supabase/migration-v2.sql has been run — the fines, votes
+  // and side-bet screens show a "database not set up" note instead.
+  v2Ready: boolean;
+};
+
+// ─── v2: fines, votes, side bets ──────────────────────────────────────────
+
+export type Settings = {
+  lateFine: number;
+  lossFine: number;
+  streak4Fine: number;
+  topup2: number;
+  topup3: number;
+  overdueFine: number;
+  sideBetTaxPct: number;
+  rulesText: string;
+  finesFromWeek: number;
+};
+
+export type FineKind = "late" | "loss" | "overdue" | "manual";
+
+export type Fine = {
+  id: string;
+  week: number | null;
+  playerId: string;
+  kind: FineKind;
+  amount: number;
+  reason: string;
+  paid: boolean;
+  paidAt: string | null;
+  movementId: string | null;
+  parentId: string | null;
+  createdAt: string;
+};
+
+export type VoteKind = "star" | "poo" | "win" | "lose";
+
+export type Vote = {
+  id: string;
+  week: number;
+  voterId: string;
+  targetId: string;
+  kind: VoteKind;
+};
+
+export type SideBet = {
+  id: string;
+  week: number;
+  creatorId: string;
+  opponentId: string;
+  subjectId: string;
+  creatorBacks: "win" | "lose";
+  amount: number;
+  status: "open" | "accepted" | "declined";
+  paid: boolean;
+  movementId: string | null;
+  createdAt: string;
 };

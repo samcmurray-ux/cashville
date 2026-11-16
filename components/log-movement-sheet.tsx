@@ -3,10 +3,10 @@
 // Log Movement bottom sheet — any €in or €out the players agreed in the chat.
 // Types match the migration check constraint: win | forfeit | bonus | adjust.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sheet } from "./sheet";
-import { addMovement } from "@/lib/bd";
-import type { MovementRow } from "@/lib/types";
+import { addMovement, removeMovement, updateMovement } from "@/lib/bd";
+import type { MovementRow, ViewMovement } from "@/lib/types";
 
 const TYPES: { value: MovementRow["type"]; label: string; sub: string }[] = [
   { value: "win", label: "Acca win", sub: "the slip landed" },
@@ -19,11 +19,14 @@ export function LogMovementSheet({
   open,
   onClose,
   defaultWeek,
+  existing,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   defaultWeek: number | null;
+  // When set, the sheet edits this entry instead of adding a new one.
+  existing?: ViewMovement | null;
   onSaved?: () => void;
 }) {
   const [type, setType] = useState<MovementRow["type"]>("forfeit");
@@ -33,6 +36,17 @@ export function LogMovementSheet({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setType(existing?.type ?? "forfeit");
+    setAmount(existing ? String(existing.amount) : "");
+    setWeekStr(
+      existing ? (existing.week != null ? String(existing.week) : "") : defaultWeek != null ? String(defaultWeek) : "",
+    );
+    setNotes(existing?.notes ?? "");
+  }, [open, existing, defaultWeek]);
+
   const submit = async () => {
     setError(null);
     const amt = parseFloat(amount);
@@ -40,7 +54,8 @@ export function LogMovementSheet({
     const wk = weekStr.trim() ? parseInt(weekStr, 10) : null;
     setSaving(true);
     try {
-      await addMovement({ week: wk, type, amount: amt, notes });
+      if (existing) await updateMovement(existing.id, { week: wk, type, amount: amt, notes });
+      else await addMovement({ week: wk, type, amount: amt, notes });
       onSaved?.();
       onClose();
       // Reset for next open
@@ -54,7 +69,7 @@ export function LogMovementSheet({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Log a movement">
+    <Sheet open={open} onClose={onClose} title={existing ? "Edit entry" : "Log a movement"}>
       <div className="space-y-4">
         <div>
           <Label>Type</Label>
@@ -175,6 +190,29 @@ export function LogMovementSheet({
         )}
 
         <div className="flex gap-2 pt-2">
+          {existing && (
+            <button
+              onClick={async () => {
+                if (!confirm("Delete this entry from the pot?")) return;
+                await removeMovement(existing.id);
+                onSaved?.();
+                onClose();
+              }}
+              disabled={saving}
+              aria-label="Delete entry"
+              className="font-stamp uppercase"
+              style={{
+                fontSize: 14,
+                padding: "0 14px",
+                border: "1.5px solid var(--c-burgundy)",
+                color: "var(--c-burgundy)",
+                background: "transparent",
+                borderRadius: 2,
+              }}
+            >
+              ✕
+            </button>
+          )}
           <button
             onClick={onClose}
             disabled={saving}
@@ -204,7 +242,7 @@ export function LogMovementSheet({
               opacity: saving ? 0.6 : 1,
             }}
           >
-            {saving ? "Logging…" : "Log it"}
+            {saving ? "Saving…" : existing ? "Save changes" : "Log it"}
           </button>
         </div>
       </div>
