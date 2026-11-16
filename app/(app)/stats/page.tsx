@@ -171,7 +171,14 @@ export default function StatsPage() {
               }}
             >
               <div className="flex items-center gap-2 mb-1.5">
-                <Avatar player={a.winner} size={28} />
+                {a.takenFrom && (
+                  <span className="cv-handover-old" style={{ display: "inline-flex", marginRight: -14 }}>
+                    <Avatar player={a.takenFrom} size={28} />
+                  </span>
+                )}
+                <span className={a.takenFrom ? "cv-handover-new" : undefined} style={{ display: "inline-flex" }}>
+                  <Avatar player={a.winner} size={28} />
+                </span>
                 <div
                   className="font-stamp uppercase min-w-0 flex-1"
                   style={{ fontSize: 10, letterSpacing: "0.16em", color: a.color }}

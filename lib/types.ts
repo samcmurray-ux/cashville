@@ -10,6 +10,8 @@ export type Player = {
   is_admin: boolean | null;
   // Small square image as a data: URL, uploaded by the player. Null = initials.
   photo?: string | null;
+  // Public URL of the player's celebration clip (short video or GIF).
+  clip?: string | null;
 };
 
 export type WeekRow = {

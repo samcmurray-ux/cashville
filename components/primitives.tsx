@@ -1,7 +1,10 @@
+"use client";
+
 // Ca$hville design primitives — port of the JSX equivalents in app-1.jsx.
 // All colors flow through CSS vars so the same components work across all
 // three themes (Travel Almanac / Stadium Night / Tabloid Tuesday).
 
+import { createContext, useContext } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { Player } from "@/lib/types";
 
@@ -244,7 +247,11 @@ const INITIALS: Record<string, string> = {
   rob: "RO",
 };
 
-// ─── Avatar (player initials + colored bg + ink border) ────────────────
+// Current streak per player id: +3 = three wins on the spin, -3 = three
+// losses. Provided by the app shell; avatars show 🔥 or 🧊 from 3 up.
+export const StreakContext = createContext<Record<string, number>>({});
+
+// ─── Avatar (photo, or initials on a coloured disc) ────────────────────
 export function Avatar({
   player,
   size = 36,
@@ -254,47 +261,42 @@ export function Avatar({
   size?: number;
   ring?: string;
 }) {
+  const streaks = useContext(StreakContext);
   if (!player) return null;
-  if (player.photo) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={player.photo}
-        alt={player.name}
-        className="shrink-0"
-        style={{
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          objectFit: "cover",
-          border: "2px solid var(--c-ink)",
-          boxShadow: ring ? `0 0 0 3px var(--c-paper), 0 0 0 5px ${ring}` : "none",
-        }}
-      />
-    );
-  }
-  const initials = INITIALS[player.id] ?? player.name.slice(0, 2).toUpperCase();
-  const bg = `oklch(0.58 0.14 ${player.hue})`;
-  return (
+  const shared: CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    border: "2px solid var(--c-ink)",
+    boxShadow: ring ? `0 0 0 3px var(--c-paper), 0 0 0 5px ${ring}` : "none",
+  };
+  const face = player.photo ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={player.photo} alt={player.name} className="shrink-0" style={{ ...shared, objectFit: "cover" }} />
+  ) : (
     <div
       className="inline-flex items-center justify-center font-display shrink-0"
       style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: bg,
+        ...shared,
+        background: `oklch(0.58 0.14 ${player.hue})`,
         color: "var(--c-paper)",
         fontWeight: 400,
         fontSize: size * 0.42,
         letterSpacing: "0.01em",
-        border: "2px solid var(--c-ink)",
-        boxShadow: ring
-          ? `0 0 0 3px var(--c-paper), 0 0 0 5px ${ring}`
-          : "none",
       }}
     >
-      {initials}
+      {INITIALS[player.id] ?? player.name.slice(0, 2).toUpperCase()}
     </div>
+  );
+  const streak = streaks[player.id] ?? 0;
+  if (size < 28 || Math.abs(streak) < 3) return face;
+  return (
+    <span className="cv-avatar-wrap" title={streak > 0 ? `${streak} wins in a row` : `${-streak} losses in a row`}>
+      {face}
+      <span aria-hidden className={"cv-streak" + (streak > 0 ? " cv-streak-hot" : "")} style={{ fontSize: Math.max(13, size * 0.42) }}>
+        {streak > 0 ? "🔥" : "🧊"}
+      </span>
+    </span>
   );
 }
 

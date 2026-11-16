@@ -3,14 +3,16 @@
 // Auto-written recap of the latest settled week: the result, hero and
 // villain, vote winners, fines, top-ups and side bets. Shown on Home.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, Eyebrow, Headline, Scribble } from "./primitives";
 import { fmtMoney } from "@/lib/bd";
 import { computeRecap } from "@/lib/honours";
 import type { BD, Player } from "@/lib/types";
+import { WeeklyWrap } from "./weekly-wrap";
 
 export function LastWeekend({ bd }: { bd: BD }) {
   const r = useMemo(() => computeRecap(bd), [bd]);
+  const [playing, setPlaying] = useState(false);
   if (!r) return null;
   const w = r.week;
   const names = (ps: Player[]) => ps.map((p) => p.name).join(", ");
@@ -51,6 +53,20 @@ export function LastWeekend({ bd }: { bd: BD }) {
             : `${names(r.losers)} · would've paid ${fmtMoney(w.stake * w.combinedOdds)}`}
         </Scribble>
       </div>
+      <button
+        onClick={() => setPlaying(true)}
+        className="w-full font-stamp uppercase py-3"
+        style={{
+          fontSize: 14,
+          letterSpacing: "0.16em",
+          background: "var(--c-ink)",
+          color: "var(--c-paper)",
+          borderRadius: 0,
+        }}
+      >
+        ▶ Play the weekly wrap
+      </button>
+      {playing && <WeeklyWrap bd={bd} onClose={() => setPlaying(false)} />}
       {lines.map((l, i) => (
         <div
           key={i}

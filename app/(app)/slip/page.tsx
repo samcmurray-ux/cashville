@@ -327,15 +327,19 @@ export default function SlipPage() {
                   await setPickResult(week.week, p.playerId, result);
                   // The first loss kills the slip; the seventh win lands it.
                   if (result === "Lost" && p.result !== "Lost" && !others.some((x) => x.result === "Lost")) {
-                    fireMoment("killed");
+                    fireMoment("killed", { player, week: week.week, text: p.sel });
                     notify({ kind: "killed", week: week.week, playerId: p.playerId, actorId: meId });
                   } else if (
                     result === "Won" &&
                     others.length === 6 &&
                     others.every((x) => x.filled && x.result === "Won")
                   ) {
-                    fireMoment("landed");
+                    fireMoment("landed", { player });
                     notify({ kind: "landed", week: week.week, actorId: meId });
+                  }
+                  else if (result === "Won" && p.result !== "Won") {
+                    // One leg home: plays that player's clip if they have one.
+                    fireMoment("won", { player });
                   }
                   if (result === "Lost" && p.result !== "Lost") {
                     notify({ kind: "fined", week: week.week, playerId: p.playerId, fineKind: "loss", actorId: meId });
