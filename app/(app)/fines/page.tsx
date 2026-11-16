@@ -31,6 +31,8 @@ import {
 } from "@/lib/bd";
 import type { BD, Fine, FineKind, Settings } from "@/lib/types";
 import { fireMoment } from "@/components/moments";
+import { notify } from "@/lib/push";
+import { useMe } from "@/lib/useMe";
 
 const KIND_COLOR: Record<FineKind, string> = {
   late: "var(--c-mustard)",
@@ -344,6 +346,7 @@ function FineSheet({
     loss: bd.settings.lossFine,
     manual: 10,
   };
+  const { meId } = useMe();
   const [playerId, setPlayerId] = useState<string | null>(fine?.playerId ?? null);
   const [kind, setKind] = useState<"late" | "loss" | "manual">(
     fine && fine.kind !== "overdue" ? fine.kind : "manual",
@@ -372,6 +375,7 @@ function FineSheet({
           reason,
         });
         fireMoment("fined");
+        notify({ kind: "fined", week: weekStr.trim() ? parseInt(weekStr, 10) : null, playerId: playerId!, fineKind: kind, actorId: meId });
       }
       onSaved();
       onClose();

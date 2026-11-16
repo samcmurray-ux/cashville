@@ -18,6 +18,7 @@ import { WeekInfoSheet } from "@/components/week-info-sheet";
 import { VoteStrip, VotesSheet } from "@/components/votes";
 import { SideBetsCard } from "@/components/side-bets";
 import { fireMoment } from "@/components/moments";
+import { notify } from "@/lib/push";
 
 export default function SlipPage() {
   const { bd, reload } = useBD();
@@ -327,12 +328,17 @@ export default function SlipPage() {
                   // The first loss kills the slip; the seventh win lands it.
                   if (result === "Lost" && p.result !== "Lost" && !others.some((x) => x.result === "Lost")) {
                     fireMoment("killed");
+                    notify({ kind: "killed", week: week.week, playerId: p.playerId, actorId: meId });
                   } else if (
                     result === "Won" &&
                     others.length === 6 &&
                     others.every((x) => x.filled && x.result === "Won")
                   ) {
                     fireMoment("landed");
+                    notify({ kind: "landed", week: week.week, actorId: meId });
+                  }
+                  if (result === "Lost" && p.result !== "Lost") {
+                    notify({ kind: "fined", week: week.week, playerId: p.playerId, fineKind: "loss", actorId: meId });
                   }
                   await reload();
                 }}

@@ -14,6 +14,7 @@ import {
   sideBetOutcome,
 } from "@/lib/bd";
 import type { BD, Player, SideBet, ViewWeek } from "@/lib/types";
+import { notify } from "@/lib/push";
 import { Card, Eyebrow, Scribble } from "./primitives";
 import { ErrorLine, Label, NotReadyNote, PlayerChoice, Segmented, SheetButtons, inputStyle } from "./ui";
 
@@ -109,10 +110,16 @@ export function SideBetsCard({
 
                 {out.state === "open" && meId === b.opponentId && (
                   <>
-                    <Mini onClick={() => act(() => respondSideBet(b.id, "accepted"))} solid>
+                    <Mini onClick={() => act(async () => {
+                        await respondSideBet(b.id, "accepted");
+                        notify({ kind: "side_bet_reply", betId: b.id });
+                      })} solid>
                       Accept
                     </Mini>
-                    <Mini onClick={() => act(() => respondSideBet(b.id, "declined"))}>Decline</Mini>
+                    <Mini onClick={() => act(async () => {
+                        await respondSideBet(b.id, "declined");
+                        notify({ kind: "side_bet_reply", betId: b.id });
+                      })}>Decline</Mini>
                   </>
                 )}
                 {out.state === "won" && (
@@ -238,7 +245,7 @@ function SideBetSheet({
     if (!Number.isFinite(amt) || amt <= 0) return setError("Enter an amount");
     setSaving(true);
     try {
-      await addSideBet({
+      const betId = await addSideBet({
         week: week.week,
         creatorId: meId,
         opponentId: opponent,
@@ -246,6 +253,7 @@ function SideBetSheet({
         creatorBacks: backs,
         amount: Math.round(amt * 100) / 100,
       });
+      notify({ kind: "side_bet_offer", betId });
       onSaved();
       onClose();
     } catch (e) {

@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Sheet } from "./sheet";
 import { addPick, clearPick, setLateFine } from "@/lib/bd";
 import type { Fine, ViewPick } from "@/lib/types";
+import { notify } from "@/lib/push";
+import { useMe } from "@/lib/useMe";
 
 const SPORTS = ["Football", "Rugby", "NFL", "Horses", "GAA", "Golf", "NBA", "MMA", "Darts", "Other"] as const;
 
@@ -92,6 +94,7 @@ export function AddPickSheet({
   }, [open, existing]);
 
   // Live odds parse — drives the big decimal preview + validation.
+  const { meId } = useMe();
   const parsed = useMemo(() => parseOdds(oddsText), [oddsText]);
   const [late, setLate] = useState(!!lateFine);
   useEffect(() => {
@@ -117,7 +120,10 @@ export function AddPickSheet({
       );
       if (lateFineAmount != null && late !== !!lateFine && !lateFine?.paid) {
         await setLateFine(weekNum, playerId, late);
+        if (late) notify({ kind: "fined", week: weekNum, playerId, fineKind: "late", actorId: meId });
       }
+      // Tell the others when a pick goes in (not on every later edit).
+      if (!existing?.filled) notify({ kind: "pick_in", week: weekNum, playerId, actorId: meId });
       onSaved?.();
       onClose();
     } catch (e) {
