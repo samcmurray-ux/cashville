@@ -70,6 +70,7 @@ export default function FinesPage() {
   const togglePaid = async (f: Fine) => {
     try {
       await setFinePaid(f, !f.paid, name(f.playerId));
+      if (!f.paid) fireMoment("paid");
       await reload();
     } catch (e) {
       alert((e as Error).message || "That didn't save");
@@ -120,6 +121,22 @@ export default function FinesPage() {
                   : `pay by ${deadline.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}`}
           </span>
         </button>
+        {overdue && (
+          <span
+            className="font-stamp uppercase shrink-0"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.14em",
+              color: "var(--c-burgundy)",
+              border: "2px solid var(--c-burgundy)",
+              padding: "1px 5px",
+              borderRadius: 3,
+              transform: "rotate(-8deg)",
+            }}
+          >
+            Overdue
+          </span>
+        )}
         <div
           className="font-display shrink-0"
           style={{ fontSize: 20, lineHeight: 1, color: f.paid ? "var(--c-forest)" : "var(--c-burgundy)" }}

@@ -44,6 +44,8 @@ export default function HomePage() {
   const week = bd.currentWeek;
   const deadline = deadlineFor(week.date);
   const left = countdown(deadline, now);
+  // Last hour before the deadline: the countdown goes red and pulses.
+  const panic = !!left && deadline.getTime() - now.getTime() < 60 * 60 * 1000;
   const inCount = week.picks.filter((p) => p.filled).length;
   const myPick = meId ? week.picks.find((p) => p.playerId === meId) : null;
   const placer = bd.players.find((p) => p.id === week.placerId);
@@ -78,11 +80,14 @@ export default function HomePage() {
             </div>
             {left && (
               <div className="text-right shrink-0">
-                <div className="font-display" style={{ fontSize: 34, lineHeight: 1, color: "var(--c-denim)" }}>
+                <div
+                  className={"font-display" + (panic ? " cv-panic" : "")}
+                  style={{ fontSize: 34, lineHeight: 1, color: "var(--c-denim)" }}
+                >
                   {left}
                 </div>
                 <div className="font-mono uppercase" style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--c-faint)", marginTop: 3 }}>
-                  to go
+                  {panic ? "hurry up" : "to go"}
                 </div>
               </div>
             )}

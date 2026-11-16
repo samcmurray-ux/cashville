@@ -970,3 +970,25 @@ export async function setPlayerPhoto(playerId: string, photo: string | null) {
   const { error } = await sb().from("players").update({ photo }).eq("id", playerId);
   if (error) throw error;
 }
+
+// ─── Celebration clips ──────────────────────────────────────────────────
+// A short video or GIF per player, kept in the public "clips" storage
+// folder. It plays when their pick wins, or when they kill the slip.
+export const CLIP_MAX_MB = 12;
+
+export async function setPlayerClip(playerId: string, file: File | null) {
+  const client = sb();
+  let url: string | null = null;
+  if (file) {
+    if (file.size > CLIP_MAX_MB * 1024 * 1024) {
+      throw new Error(`That clip is too big — keep it under ${CLIP_MAX_MB} MB (a few seconds is plenty)`);
+    }
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const path = `${playerId}-${Date.now()}.${ext}`;
+    const { error } = await client.storage.from("clips").upload(path, file, { contentType: file.type, upsert: true });
+    if (error) throw error;
+    url = client.storage.from("clips").getPublicUrl(path).data.publicUrl;
+  }
+  const { error } = await client.from("players").update({ clip: url }).eq("id", playerId);
+  if (error) throw error;
+}

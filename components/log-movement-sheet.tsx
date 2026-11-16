@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Sheet } from "./sheet";
 import { addMovement, removeMovement, updateMovement } from "@/lib/bd";
 import type { MovementRow, ViewMovement } from "@/lib/types";
+import { fireMoment } from "./moments";
 
 const TYPES: { value: MovementRow["type"]; label: string; sub: string }[] = [
   { value: "win", label: "Acca win", sub: "the slip landed" },
@@ -55,7 +56,10 @@ export function LogMovementSheet({
     setSaving(true);
     try {
       if (existing) await updateMovement(existing.id, { week: wk, type, amount: amt, notes });
-      else await addMovement({ week: wk, type, amount: amt, notes });
+      else {
+        await addMovement({ week: wk, type, amount: amt, notes });
+        if (amt > 0 && (type === "win" || type === "bonus")) fireMoment("win");
+      }
       onSaved?.();
       onClose();
       // Reset for next open

@@ -11,6 +11,7 @@ import type { Player, ViewPick, Vote, VoteKind } from "@/lib/types";
 import { Avatar } from "./primitives";
 import { ErrorLine } from "./ui";
 import { notify } from "@/lib/push";
+import { fireMoment } from "./moments";
 
 const KINDS: { kind: VoteKind; icon: string; label: string; sub: string }[] = [
   { kind: "star", icon: "⭐", label: "Bet of the week", sub: "one per week" },
@@ -101,6 +102,7 @@ export function VotesSheet({
       );
       await castVote(weekNum, meId, player.id, kind, votes);
       if (!undo) notify({ kind: "vote", week: weekNum, voterId: meId, targetId: player.id, voteKind: kind });
+      if (!undo && (kind === "star" || kind === "poo")) fireMoment(kind, { text: `${player.name}'s pick` });
       onSaved?.();
     } catch (e) {
       setError((e as Error).message || "Vote failed");

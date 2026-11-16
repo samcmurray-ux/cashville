@@ -4,10 +4,12 @@
 // of the app knows "this is your row, this is the Add my pick button."
 // Hidden behind a Switch button in the header once chosen.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMe } from "@/lib/useMe";
 import { useBD } from "@/lib/useBD";
-import { setPlayerPhoto, shrinkPhoto } from "@/lib/bd";
+import { CLIP_MAX_MB, setPlayerClip, setPlayerPhoto, shrinkPhoto } from "@/lib/bd";
+import { setSoundOn, soundOn } from "@/lib/sound";
+import { fireMoment } from "./moments";
 import type { Player } from "@/lib/types";
 import { Avatar } from "./primitives";
 import { Sheet } from "./sheet";
@@ -24,6 +26,23 @@ export function PlayerPicker({
   const { meId, me, setMeId } = useMe();
   const { reload } = useBD();
   const fileRef = useRef<HTMLInputElement>(null);
+  const clipRef = useRef<HTMLInputElement>(null);
+  const [sounds, setSounds] = useState(false);
+  useEffect(() => setSounds(soundOn()), [open]);
+
+  const saveClip = async (file: File | null) => {
+    if (!meId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setPlayerClip(meId, file);
+      await reload();
+    } catch (e) {
+      setError((e as Error).message || "Couldn't save the clip");
+    } finally {
+      setBusy(false);
+    }
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,6 +134,76 @@ export function PlayerPicker({
               }
             }}
           />
+        </div>
+      )}
+      {/* Celebration clip + sound effects. */}
+      {me && (
+        <div className="p-3 mb-4" style={{ border: "1.5px dashed var(--c-rule-strong)", borderRadius: 2 }}>
+          <div className="font-mono uppercase" style={{ fontSize: 10, letterSpacing: "0.2em", color: "var(--c-dim)", fontWeight: 600 }}>
+            Your celebration clip
+          </div>
+          <p className="font-body" style={{ fontSize: 13, color: "var(--c-ink-soft)", marginTop: 4 }}>
+            A few seconds of video or a GIF. It plays when your pick wins, and on your gravestone when you kill the slip.
+            Max {CLIP_MAX_MB} MB.
+          </p>
+          <div className="flex gap-2 mt-2 flex-wrap">
+            <button
+              onClick={() => clipRef.current?.click()}
+              disabled={busy}
+              className="font-stamp uppercase"
+              style={{ fontSize: 12, letterSpacing: "0.12em", padding: "8px 12px", borderRadius: 2, background: "var(--c-ink)", color: "var(--c-paper)", opacity: busy ? 0.5 : 1 }}
+            >
+              {busy ? "Saving…" : me.clip ? "Change clip" : "Add a clip"}
+            </button>
+            {me.clip && !busy && (
+              <>
+                <button
+                  onClick={() => fireMoment("won", { player: me })}
+                  className="font-stamp uppercase"
+                  style={{ fontSize: 12, letterSpacing: "0.12em", padding: "8px 12px", borderRadius: 2, border: "1.5px solid var(--c-ink)", color: "var(--c-ink)" }}
+                >
+                  ▶ Preview
+                </button>
+                <button
+                  onClick={() => void saveClip(null)}
+                  className="font-stamp uppercase"
+                  style={{ fontSize: 12, letterSpacing: "0.12em", padding: "8px 12px", borderRadius: 2, border: "1.5px solid var(--c-ink)", color: "var(--c-ink)" }}
+                >
+                  Remove
+                </button>
+              </>
+            )}
+          </div>
+          <input
+            ref={clipRef}
+            type="file"
+            accept="video/mp4,video/quicktime,video/webm,image/gif"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void saveClip(file);
+            }}
+          />
+          <label className="flex items-center gap-3 mt-3 pt-3" style={{ borderTop: "1px solid var(--c-rule)" }}>
+            <input
+              type="checkbox"
+              checked={sounds}
+              onChange={(e) => {
+                setSounds(e.target.checked);
+                setSoundOn(e.target.checked);
+              }}
+              style={{ width: 20, height: 20, accentColor: "var(--c-burgundy)" }}
+            />
+            <span>
+              <span className="font-display block" style={{ fontSize: 16, color: "var(--c-ink)", lineHeight: 1.1 }}>
+                Sound effects
+              </span>
+              <span className="font-mono uppercase block" style={{ fontSize: 9, letterSpacing: "0.14em", color: "var(--c-dim)", marginTop: 2 }}>
+                cash register · sad trombone · ref's whistle · this phone only
+              </span>
+            </span>
+          </label>
         </div>
       )}
       <div className="grid grid-cols-1 gap-2">

@@ -3,7 +3,7 @@
 // Pot screen — the fund. Total + progress bar to €10k + movement list +
 // floating Log Movement button. Long Climb chart is v1.1.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBD } from "@/lib/useBD";
 import { Card, Eyebrow, Headline, Postmark, Scribble, Chip } from "@/components/primitives";
 import { LogMovementSheet } from "@/components/log-movement-sheet";
@@ -29,6 +29,35 @@ export default function PotPage() {
   const { bd, reload } = useBD();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<ViewMovement | null>(null);
+
+  // The plane takes off from Dublin and the total counts up each time the
+  // page opens (and again whenever the fund changes).
+  const target = bd?.trip.current ?? 0;
+  const [shown, setShown] = useState(0);
+  const [flown, setFlown] = useState(false);
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setShown(target);
+      setFlown(true);
+      return;
+    }
+    const kick = requestAnimationFrame(() => setFlown(true));
+    const from = shown;
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / 1400);
+      setShown(from + (target - from) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      cancelAnimationFrame(kick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
 
   if (!bd) return null;
 
@@ -67,7 +96,7 @@ export default function PotPage() {
 
           <div className="flex items-baseline gap-2 mt-4">
             <Headline size={48} color="var(--c-forest)">
-              {fmtMoney(bd.trip.current)}
+              {fmtMoney(shown)}
             </Headline>
             <Headline size={22} color="var(--c-faint)">
               / {fmtMoney(bd.trip.target)}
@@ -86,19 +115,19 @@ export default function PotPage() {
               }}
             />
             <div
-              className="absolute left-2"
+              className="absolute left-2 cv-glide"
               style={{
                 top: 17,
                 height: 4,
                 background: "var(--c-forest)",
-                width: `calc(${pct}% - 4px)`,
+                width: flown ? `calc(${pct}% - 4px)` : "0%",
               }}
             />
             <div
-              className="absolute"
+              className="absolute cv-glide"
               style={{
                 top: 7,
-                left: `calc(${pct}% - 14px)`,
+                left: flown ? `calc(${pct}% - 14px)` : "-6px",
                 fontSize: 24,
               }}
             >

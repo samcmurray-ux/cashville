@@ -15,6 +15,7 @@ import {
 } from "@/lib/bd";
 import type { BD, Player, SideBet, ViewWeek } from "@/lib/types";
 import { notify } from "@/lib/push";
+import { fireMoment } from "./moments";
 import { Card, Eyebrow, Scribble } from "./primitives";
 import { ErrorLine, Label, NotReadyNote, PlayerChoice, Segmented, SheetButtons, inputStyle } from "./ui";
 
@@ -113,6 +114,7 @@ export function SideBetsCard({
                     <Mini onClick={() => act(async () => {
                         await respondSideBet(b.id, "accepted");
                         notify({ kind: "side_bet_reply", betId: b.id });
+                        fireMoment("handshake");
                       })} solid>
                       Accept
                     </Mini>
@@ -125,14 +127,15 @@ export function SideBetsCard({
                 {out.state === "won" && (
                   <Mini
                     onClick={() =>
-                      act(() =>
-                        setSideBetPaid(
+                      act(async () => {
+                        await setSideBetPaid(
                           b,
                           !b.paid,
                           out.tax,
                           `Side bet tax · ${name(out.winnerId)} beat ${name(out.loserId)}`,
-                        ),
-                      )
+                        );
+                        if (!b.paid) fireMoment("gavel");
+                      })
                     }
                     solid={!b.paid}
                   >
