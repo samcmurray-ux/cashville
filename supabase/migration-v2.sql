@@ -29,7 +29,7 @@ create table if not exists public.app_settings (
   fines_from_week  int     not null default 0
 );
 insert into public.app_settings (id, fines_from_week)
-select 1, coalesce((select max(week_number) from public.weeks), 0)
+select 1, coalesce((select max(week_number) from public.weeks), 0) + 1
 on conflict (id) do nothing;
 
 create table if not exists public.fines (

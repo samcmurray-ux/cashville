@@ -45,7 +45,8 @@ export function EditStakeSheet({
     if (!valid) return setError("Enter a stake above €0");
     setSaving(true);
     try {
-      await setWeekStake(weekNum, Math.round(value * 100) / 100);
+      // The stake column is whole euros.
+      await setWeekStake(weekNum, Math.round(value));
       onSaved?.();
       onClose();
     } catch (e) {
