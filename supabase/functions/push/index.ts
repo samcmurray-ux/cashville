@@ -171,29 +171,34 @@ Deno.serve(async (req) => {
     webpush.setVapidDetails("https://cashville.vercel.app", keys.public_key, keys.private_key);
     let sent = 0;
     let failed = 0;
+    // One line per phone we tried, so a failed delivery can be diagnosed.
+    const results: { player: string; service: string; status: number | string; detail?: string }[] = [];
     for (const n of notes) {
       if (!n.to.length) continue;
-      const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("player_id", n.to);
+      const { data: subs } = await db.from("push_subscriptions").select("id, player_id, endpoint, p256dh, auth").in("player_id", n.to);
       await Promise.all(
         (subs ?? []).map(async (s) => {
+          const service = new URL(s.endpoint).hostname;
           try {
-            await webpush.sendNotification(
+            const res = await webpush.sendNotification(
               { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
               JSON.stringify({ title: n.title, body: n.body, url: n.url, tag: n.tag }),
-              { TTL: 60 * 60 * 12 },
+              { TTL: 60 * 60 * 12, urgency: "high" },
             );
             sent++;
+            results.push({ player: s.player_id, service, status: res.statusCode });
           } catch (err) {
             failed++;
+            const e = err as { statusCode?: number; body?: string; message?: string };
+            results.push({ player: s.player_id, service, status: e.statusCode ?? "error", detail: (e.body || e.message || "").slice(0, 200) });
             // 404/410 = that phone has unsubscribed or reinstalled; forget it.
-            const code = (err as { statusCode?: number }).statusCode;
-            if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("id", s.id);
-            else console.error("push failed", code, (err as Error).message);
+            if (e.statusCode === 404 || e.statusCode === 410) await db.from("push_subscriptions").delete().eq("id", s.id);
           }
         }),
       );
     }
-    return json({ notes: notes.length, sent, failed });
+    console.log(JSON.stringify({ type: body.type, kind: body.event?.kind, notes: notes.length, sent, failed, results }));
+    return json({ notes: notes.length, sent, failed, results });
   } catch (err) {
     console.error(err);
     return json({ error: (err as Error).message }, 500);
