@@ -934,3 +934,34 @@ export async function setSideBetPaid(bet: SideBet, paid: boolean, tax: number, n
   const { error } = await sb().from("side_bets").update({ paid, movement_id: movementId }).eq("id", bet.id);
   if (error) throw error;
 }
+
+// ─── Player photos ──────────────────────────────────────────────────────
+// Shrink whatever the phone hands us to a 160px centre-cropped square JPEG
+// (a few KB) so it can live in the players row and load with everything else.
+export async function shrinkPhoto(file: File, size = 160): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("That file isn't a picture the phone can read"));
+      el.src = url;
+    });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    canvas
+      .getContext("2d")!
+      .drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// `photo` null = back to initials.
+export async function setPlayerPhoto(playerId: string, photo: string | null) {
+  const { error } = await sb().from("players").update({ photo }).eq("id", playerId);
+  if (error) throw error;
+}

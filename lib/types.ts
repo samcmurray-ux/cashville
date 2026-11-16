@@ -8,6 +8,8 @@ export type Player = {
   hue: number;
   persona: string | null;
   is_admin: boolean | null;
+  // Small square image as a data: URL, uploaded by the player. Null = initials.
+  photo?: string | null;
 };
 
 export type WeekRow = {
