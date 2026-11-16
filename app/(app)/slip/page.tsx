@@ -134,7 +134,7 @@ export default function SlipPage() {
                   padding: "2px 6px",
                   borderRadius: 2,
                   background: placer.id === meId ? "var(--c-mustard)" : "var(--c-bg2)",
-                  color: "var(--c-ink)",
+                  color: placer.id === meId ? "var(--c-on-mustard)" : "var(--c-ink)",
                   fontWeight: 600,
                 }}
               >
@@ -150,7 +150,7 @@ export default function SlipPage() {
               <div className="mt-1">
                 {isCurrent ? (
                   <Scribble color="var(--c-dim)" size={20} rotate={-2}>
-                    get your picks in ↓
+                    picks due Friday 6pm ↓
                   </Scribble>
                 ) : week.accaWon ? (
                   <Scribble color="var(--c-forest)" size={20} rotate={-1.5}>
@@ -245,7 +245,7 @@ export default function SlipPage() {
                 className="font-stamp uppercase ml-1"
                 style={{
                   background: "var(--c-mustard)",
-                  color: "var(--c-ink)",
+                  color: "var(--c-on-mustard)",
                   border: "none",
                   padding: "5px 9px",
                   borderRadius: 2,
@@ -275,19 +275,19 @@ export default function SlipPage() {
                 style={{
                   fontSize: 10,
                   letterSpacing: "0.2em",
-                  color: "var(--c-ink)",
+                  color: "var(--c-on-mustard)",
                 }}
               >
                 you're up, {me.name.toLowerCase()}
               </div>
               <div
                 className="font-display"
-                style={{ fontSize: 22, color: "var(--c-ink)", lineHeight: 1.1 }}
+                style={{ fontSize: 22, color: "var(--c-on-mustard)", lineHeight: 1.1 }}
               >
                 Add my pick →
               </div>
             </div>
-            <Stamp color="var(--c-ink)" rotate={-4} size="md">
+            <Stamp color="var(--c-on-mustard)" rotate={-4} size="md">
               tap to lock
             </Stamp>
           </button>

@@ -1,11 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Bebas+Neue&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600;700&family=Caveat:wght@500;700&family=Alfa+Slab+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Bebas+Neue&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600;700&family=Caveat:wght@500;700&family=Alfa+Slab+One&family=Outfit:wght@400;500;600;700&family=Yellowtail&family=Nunito:wght@500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ─── Theme system ───────────────────────────────────────────────────────
-   Three themes ported from _CASHVILLE_THEMES in app-1.jsx. Each is a set
+   Three themes ported from _CASHVILLE_THEMES in app-1.jsx, plus Nashville
+   Neon and Group Chat. Each is a set
    of CSS custom properties. The active theme is selected by an attribute
    on <html>:
      <html data-theme="almanac">  — cream paper, stamps (default)
@@ -34,6 +35,8 @@
   --c-brick: #a14228;
   --c-navy: #1b2540;
   --c-push: #b78420;
+  /* Text colour for anything sitting on a mustard background. */
+  --c-on-mustard: #1c1a16;
 
   --font-display: 'DM Serif Display';
   --font-body: 'Lora';
@@ -61,6 +64,7 @@
   --c-brick: #e8a04a;
   --c-navy: #9fb8d6;
   --c-push: #f0c34c;
+  --c-on-mustard: #162017;
 }
 
 /* Tabloid Tuesday — high-contrast newsprint, screaming red.
@@ -86,6 +90,102 @@
   --font-display: 'Alfa Slab One';
 }
 
+/* Nashville Neon — Broadway at midnight. Dark, with pink sign lettering
+   for the logo and scribbles, and a soft glow on cards and headline numbers. */
+[data-theme="neon"] {
+  --c-bg: #0d0b1e;
+  --c-bg2: #1d1940;
+  --c-paper: #17142e;
+  --c-ink: #f3f0ff;
+  --c-ink-soft: #cfc9ee;
+  --c-dim: #a39dcb;
+  --c-faint: #7772a0;
+  --c-rule: rgba(243, 240, 255, 0.10);
+  --c-rule-strong: rgba(243, 240, 255, 0.26);
+  --c-burgundy: #ff5fab;
+  --c-denim: #4fe3ff;
+  --c-mustard: #ffc857;
+  --c-forest: #5ef2a0;
+  --c-brick: #ff8a5c;
+  --c-navy: #9db4ff;
+  --c-push: #ffc857;
+  --c-on-mustard: #0d0b1e;
+
+  --font-display: 'Outfit';
+  --font-body: 'Outfit';
+  --font-mono: 'Outfit';
+  --font-stamp: 'Outfit';
+  --font-scribble: 'Yellowtail';
+  --font-slab: 'Outfit';
+}
+[data-theme="neon"] .font-display { font-weight: 700 !important; letter-spacing: -0.01em !important; }
+[data-theme="neon"] .font-stamp { font-weight: 700; }
+[data-theme="neon"] .cv-logo .font-display {
+  font-family: 'Yellowtail', cursive !important;
+  font-weight: 400 !important;
+  font-size: 52px !important;
+  line-height: 1.05 !important;
+  color: #ff5fab !important;
+  text-shadow: 0 0 8px #ff4fa3, 0 0 26px #c2187a;
+}
+[data-theme="neon"] .cv-logo .font-display span { color: #ffc857 !important; font-style: normal !important; }
+[data-theme="neon"] .cv-card {
+  border-radius: 16px !important;
+  overflow: hidden;
+  border-color: rgba(255, 95, 171, 0.35);
+  box-shadow: 0 0 18px rgba(255, 79, 163, 0.14);
+}
+[data-theme="neon"] button,
+[data-theme="neon"] input,
+[data-theme="neon"] select,
+[data-theme="neon"] textarea { border-radius: 12px !important; }
+[data-theme="neon"] .bg-hatch-burgundy {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 95, 171, 0.07) 6px 12px);
+}
+
+/* Group Chat — light, rounded and friendly. */
+[data-theme="chat"] {
+  --c-bg: #f1eefb;
+  --c-bg2: #e9e4f8;
+  --c-paper: #ffffff;
+  --c-ink: #1f1b33;
+  --c-ink-soft: #4a4560;
+  --c-dim: #5d5873;
+  --c-faint: #9a94b5;
+  --c-rule: rgba(31, 27, 51, 0.10);
+  --c-rule-strong: rgba(31, 27, 51, 0.20);
+  --c-burgundy: #c2255c;
+  --c-denim: #5b3fc4;
+  --c-mustard: #f4b740;
+  --c-forest: #0b7a52;
+  --c-brick: #b4530a;
+  --c-navy: #45308f;
+  --c-push: #a3690a;
+  --c-on-mustard: #1f1b33;
+
+  --font-display: 'Nunito';
+  --font-body: 'Nunito';
+  --font-mono: 'Nunito';
+  --font-stamp: 'Nunito';
+  --font-slab: 'Nunito';
+}
+[data-theme="chat"] .font-display { font-weight: 900 !important; letter-spacing: -0.01em !important; }
+[data-theme="chat"] .font-stamp,
+[data-theme="chat"] .font-mono { font-weight: 800; }
+[data-theme="chat"] .cv-logo .font-display { color: #5b3fc4 !important; }
+[data-theme="chat"] .cv-card {
+  border-radius: 20px !important;
+  overflow: hidden;
+  border-color: transparent;
+  box-shadow: 0 2px 10px rgba(60, 40, 130, 0.10);
+}
+[data-theme="chat"] button,
+[data-theme="chat"] input,
+[data-theme="chat"] select,
+[data-theme="chat"] textarea { border-radius: 14px !important; }
+[data-theme="chat"] .cv-nav { border-radius: 22px 22px 0 0; box-shadow: 0 -2px 12px rgba(60, 40, 130, 0.10); }
+[data-theme="chat"] .bg-hatch-burgundy { background-image: none; background-color: rgba(91, 63, 196, 0.05); }
+
 /* Auto-apply Stadium for dark-mode users who haven't picked a theme.
    The :not selector means "don't override an explicit choice." */
 @media (prefers-color-scheme: dark) {
@@ -106,6 +206,7 @@
     --c-brick: #e8a04a;
     --c-navy: #9fb8d6;
     --c-push: #f0c34c;
+    --c-on-mustard: #162017;
   }
 }
 

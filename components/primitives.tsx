@@ -18,7 +18,7 @@ export function Card({
   return (
     <div
       className={
-        "relative bg-paper border border-rule-strong shadow-card " + className
+        "cv-card relative bg-paper border border-rule-strong shadow-card " + className
       }
       style={{ borderRadius: 2 }}
     >

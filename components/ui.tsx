@@ -130,7 +130,7 @@ export function PlayerChoice({
                 padding: "4px 10px 4px 4px",
                 borderRadius: 999,
                 fontSize: 15,
-                color: "var(--c-ink)",
+                color: active ? "var(--c-on-mustard)" : "var(--c-ink)",
                 border: `1.5px solid ${active ? "var(--c-burgundy)" : "var(--c-rule-strong)"}`,
                 background: active ? "var(--c-mustard)" : "transparent",
               }}

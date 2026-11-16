@@ -112,7 +112,7 @@ const SLAG: Record<string, string[]> = {
     "Nashville says thank you.",
   ],
   lateMerchant: [
-    "Friday 1pm is more of a suggestion.",
+    "Friday 6pm is more of a suggestion.",
     "Operates on his own time zone.",
   ],
   shark: [

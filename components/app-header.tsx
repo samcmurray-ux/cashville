@@ -46,11 +46,13 @@ export function AppHeader({
           >
             {playedCount} weeks logged · season 25/26
           </div>
-          <Headline size={44} family="display">
-            Ca
-            <span style={{ color: "var(--c-mustard)", fontStyle: "italic" }}>$</span>
-            hville
-          </Headline>
+          <div className="cv-logo">
+            <Headline size={44} family="display">
+              Ca
+              <span style={{ color: "var(--c-mustard)", fontStyle: "italic" }}>$</span>
+              hville
+            </Headline>
+          </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <Scribble color="var(--c-burgundy)" size={17} rotate={-1.5}>
               seven gents · one slip ·

@@ -1,6 +1,7 @@
 "use client";
 
-// Theme system — three switchable themes from the prototype. Selection is
+// Theme system — switchable themes (three from the prototype, plus
+// Nashville Neon and Group Chat). Selection is
 // persisted in localStorage and applied as a data-theme attribute on <html>
 // (CSS in globals.css picks it up). Falls back to prefers-color-scheme on
 // first visit so dark-mode users land on Stadium Night, not Almanac.
@@ -13,9 +14,21 @@ import {
   ReactNode,
 } from "react";
 
-export type ThemeId = "almanac" | "stadium" | "tabloid";
+export type ThemeId = "almanac" | "stadium" | "tabloid" | "neon" | "chat";
 
 export const THEMES: { id: ThemeId; label: string; blurb: string; swatch: string[] }[] = [
+  {
+    id: "neon",
+    label: "Nashville Neon",
+    blurb: "Broadway at midnight — pink signs, blue glow",
+    swatch: ["#0d0b1e", "#ff4fa3", "#ffc857", "#4fe3ff"],
+  },
+  {
+    id: "chat",
+    label: "Group Chat",
+    blurb: "light, rounded and friendly, like the WhatsApp",
+    swatch: ["#f1eefb", "#5b3fc4", "#ffd166", "#0b7a52"],
+  },
   {
     id: "almanac",
     label: "Travel Almanac",
@@ -58,9 +71,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     let stored: ThemeId | null = null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw === "almanac" || raw === "stadium" || raw === "tabloid") {
-        stored = raw;
-      }
+      if (THEMES.some((t) => t.id === raw)) stored = raw as ThemeId;
     } catch {}
     if (stored) {
       setThemeIdState(stored);

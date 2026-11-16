@@ -191,7 +191,7 @@ export default function StatsPage() {
                       padding: "1px 5px",
                       borderRadius: 2,
                       background: "var(--c-mustard)",
-                      color: "var(--c-ink)",
+                      color: "var(--c-on-mustard)",
                     }}
                   >
                     New

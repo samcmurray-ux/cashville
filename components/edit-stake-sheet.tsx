@@ -132,7 +132,7 @@ export function EditStakeSheet({
                 border: "1.5px solid var(--c-ink)",
                 borderRadius: 2,
                 background: value === q ? "var(--c-mustard)" : "transparent",
-                color: "var(--c-ink)",
+                color: value === q ? "var(--c-on-mustard)" : "var(--c-ink)",
               }}
             >
               €{q}
